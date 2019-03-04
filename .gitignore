@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# music data
+Data/fma_features/*
+Data/fma_large/*
+Data/fma_metadata/*
+Data/gtzan/*
