@@ -112,3 +112,6 @@ Data/sounds/*
 
 # trained models
 Models/*
+
+# API keys file, don't want to show this
+Spotify/API_KEYS.py
