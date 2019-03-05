@@ -104,7 +104,11 @@ venv.bak/
 .mypy_cache/
 
 # music data
-Data/fma_features/*
+Data/features/*
 Data/fma_large/*
 Data/fma_metadata/*
 Data/gtzan/*
+Data/sounds/*
+
+# trained models
+Models/*
