@@ -158,6 +158,10 @@ if __name__ == '__main__':
         freq, time = 256, 643
         dim = (freq, time)
 
+    if args.features == 'cqt':
+        freq, time = 168, 643
+        dim = (freq, time)
+
     results = pd.DataFrame({
         'name':['Time','Freq','Simple','TimeFreq']
     })
