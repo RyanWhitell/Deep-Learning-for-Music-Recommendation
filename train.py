@@ -17,7 +17,7 @@ import FMA
 parser = argparse.ArgumentParser(description="trains a model")
 parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
 parser.add_argument('-t', '--test', required=True, help='test to carry out: sgc')
-parser.add_argument('-f', '--features', required=True, help='which features to use: stft, stft_halved, mel_scaled_stft')
+parser.add_argument('-f', '--features', required=True, help='which features to use: stft, stft_halved, mel_scaled_stft, cqt')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
 
@@ -179,7 +179,7 @@ def Simple(features, input_shape, num_classes):
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
     
-    if features == 'mel_scaled_stft':
+    if features == 'mel_scaled_stft' or features == 'cqt':
         x = layers.Conv2D(16, (3, 3), strides=(1, 1), use_bias=False, name='input1_2')(x)
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
@@ -441,6 +441,12 @@ if __name__ == '__main__':
         freq, time = 256, 643
         dim = (freq, time)
         fiks = [6, 8, 12, 24, 32, 64] # 42, 32, 21, 10, 8, 4
+        tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
+
+    if args.features == 'cqt':
+        freq, time = 168, 643
+        dim = (freq, time)
+        fiks = [4, 5, 6, 12, 24, 48]  # 42, 33, 28, 14, 7, 3
         tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
 
     ################ Freq ################
