@@ -801,6 +801,7 @@ if __name__=='__main__':
             continue
 
         ################## Move temp files out of temp ##################################
+        time.sleep(5)
         try:
             printlog('Moving temp files into the permanent location...')
 
