@@ -330,8 +330,13 @@ def get_lat_long(location):
     key = '&key=' + MAPS_API_KEY
     response = requests.get(base_url + location + key)
     resp_json_payload = response.json()
-    return resp_json_payload['results'][0]['geometry']['location']
-  
+    results = resp_json_payload['results'][0]
+    country = None
+    for comp in results['address_components']:
+        if 'country' in comp['types']:
+            country = pycountry.countries.lookup(comp['long_name']).alpha_2
+    return results['geometry']['location'], country
+    
 def clean_wiki_location_text(location):
     months = re.compile(
         '(January)|(February)|(March)|(April)|(May)|(June)|(July)|(August)|(September)|(October)|(November)|(December)',
@@ -478,71 +483,71 @@ def get_artist_location(artist_name):
                 mm = True
             except Exception:
                 printlog('Nothing found, exit', e=True)
-                return location
+                return location, country
     
     if mb:
         printlog('Try to get the location from MusicBrainz...')
         try:
-            location = get_lat_long(area1 + '+' + area2 + '+' + area3)
+            location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
         except Exception:
             printlog('Failed to get the location from MusicBrainz, try Wikipedia...', e=True)
             try:
                 mb_wid, origin, born = get_metadata_wiki(artist_name)
                 if origin is not None:
-                    location = get_lat_long(origin)
+                    location, country = get_lat_long(origin)
                 elif born is not None:
-                    location = get_lat_long(born)
+                    location, country = get_lat_long(born)
             except Exception:
                 try:
                     if mb_wid is not None:
                         printlog('Failed to get the location from Wikipedia, try MusicBrainz again with wiki mb_id...', e=True)
                         mb_id, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
-                        location = get_lat_long(area1 + '+' + area2 + '+' + area3)
+                        location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                     else:
                         raise Exception('mb_wid is None')
                 except Exception:
                     printlog('Failed to get the location from MusicBrainz with wiki mb_id, try Musixmatch...', e=True)
                     try:
                         mm_id, country = get_metadata_mm(artist_name)
-                        location = get_lat_long(country)
+                        location, country = get_lat_long(country)
                     except Exception:
                         printlog('Location not found, exit', e=True)
-                        return location
+                        return location, country
                 
     if wiki:
         printlog('Try to get the location from Wikipedia...')
         try:
             if origin is not None:
-                location = get_lat_long(origin)
+                location, country = get_lat_long(origin)
             elif born is not None:
-                location = get_lat_long(born)
+                location, country = get_lat_long(born)
         except Exception:
             try:
                 if mb_wid is not None:
                     printlog('Failed to get the location from Wikipedia, try MusicBrainz again with wiki mb_id...', e=True)
                     mb_id, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
-                    location = get_lat_long(area1 + '+' + area2 + '+' + area3)
+                    location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                 else:
                     raise Exception('mb_wid is None')
             except Exception:
                 printlog('Failed to get the location from MusicBrainz with wiki mb_id, try Musixmatch...', e=True)
                 try:
                     mm_id, country = get_metadata_mm(artist_name)
-                    location = get_lat_long(country)
+                    location, country = get_lat_long(country)
                 except Exception:
                     printlog('Location not found, exit', e=True)
-                    return location
+                    return location, country
                 
     if mm:
         printlog('Try to get the location from Musixmatch...')
         try:
             mm_id, country = get_metadata_mm(artist_name)
-            location = get_lat_long(country)
+            location, country = get_lat_long(country)
         except Exception:
             printlog('Location not found, exit', e=True)
-            return mb_id, mb_wid, mm_id, location                  
+            return location, country                 
         
-    return location
+    return location, country
 
 
 if __name__=='__main__':
@@ -656,7 +661,7 @@ if __name__=='__main__':
             # {lat: 0.0, lng: 0.0}
             printlog(f'Getting location of artist...')
 
-            location = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
+            location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
 
             if location is None:
                 printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
@@ -683,16 +688,18 @@ if __name__=='__main__':
 
             printlog(f'Getting the top tracks for seed artist...')
 
+            if country is None: country = 'US'
+            
             tracks, albums, lyrics, previews, album_covers = fr_get_top_tracks_albums(
-                res=SPOTIFY.artist_top_tracks(seed_artist_id), 
+                res=SPOTIFY.artist_top_tracks(seed_artist_id, country=country), 
                 artist_name=artist_metadata.loc[seed_artist_id]['name'], 
                 artist_id=seed_artist_id
-            )
+            )    
 
             if len(tracks) == 0:
                 printlog(f'No tracks found! Bummer, cant use this artist. Try next seed artist...')
                 num_seed_artists -= 1
-                continue
+                printlog('continue')
 
         except Exception:
             printlog('Exception occured getting tracks and albums!', e=True)
