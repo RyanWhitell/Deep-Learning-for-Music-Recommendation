@@ -115,3 +115,10 @@ Models/*
 
 # API keys file, don't want to show this
 Spotify/API_KEYS.py
+
+# Data from scraping
+Spotify/lyrics/*
+Spotify/audio/*
+Spotify/albums/*
+Spotify/backups/*
+Spotify/dumps/*

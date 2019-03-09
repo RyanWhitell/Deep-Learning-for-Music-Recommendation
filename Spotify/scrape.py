@@ -61,6 +61,7 @@ SPOTIFY = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 parser = argparse.ArgumentParser(description="scrapes various apis for music content")
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
 parser.add_argument('-s', '--seeds', default=None, help='injects seed artists via comma separated list')
+parser.add_argument('-p', '--print-top-genres', default=False, help='prints top genres sorted by count')
 args = parser.parse_args()
 
 ####### Utility #######
@@ -121,6 +122,57 @@ def save_dataframes(artists, future_artists, seed_artists, albums, tracks):
         del save
 
     printlog('data.pickle saved succesfully!')
+
+def print_top_genres(ARTISTS, top_genres):
+    genre_counts = pd.DataFrame(columns=['count'])
+    for genre_list in ARTISTS.genres.values:
+        for genre in genre_list:
+            if genre in genre_counts.index:
+                genre_counts.loc[genre] += 1
+            else:
+                genre_counts.loc[genre] = 1
+
+    genre_counts = genre_counts.sort_values(by=['count'])
+    
+    top_genres_sorted = []
+    for genre in genre_counts.index:
+        if genre in top_genres:
+            top_genres_sorted.append(genre)
+
+    has_top_genre = []
+    top_genre_counts = pd.DataFrame(columns=['count'])
+    for genre in top_genres_sorted:
+        top_genre_counts.loc[genre] = 0
+
+    for genre in top_genres_sorted:
+        for index, row in ARTISTS.iterrows():
+            if index not in has_top_genre:
+                if genre in row['genres']:
+                    has_top_genre.append(index)
+                    top_genre_counts.loc[genre] += 1
+
+    for genre in top_genres_sorted:
+        for index, row in ARTISTS.iterrows():
+            if index not in has_top_genre:
+                if genre in ' '.join(row['genres']):
+                    has_top_genre.append(index)
+                    top_genre_counts.loc[genre] += 1  
+                    
+    genre_counts = pd.DataFrame(columns=['count'])
+    for genre_list in ARTISTS.loc[set(ARTISTS.index) - set(has_top_genre)].genres.values:
+        for genre in genre_list:
+            if genre in genre_counts.index:
+                genre_counts.loc[genre] += 1
+            else:
+                genre_counts.loc[genre] = 1
+                
+                
+    genre_counts = genre_counts.sort_values(by=['count'])
+    printlog(genre_counts)
+
+    top_genre_counts = top_genre_counts.sort_values(by=['count'])
+    printlog(top_genre_counts)
+
 
 ####### Data #######
 def inject_seed_artists(df, list_ids):
@@ -209,8 +261,6 @@ def get_lyrics_genius(song_title, artist_name):
         lyrics = re.sub(re.compile(r'\[Intro \d\]|\[Intro\]', re.IGNORECASE), '', lyrics)
         lyrics = re.sub(re.compile(r'^(\n)*|(\n)*$'), '', lyrics)
         return lyrics
-    else:
-        raise Exception(f'Artist not found, no hit from {hits} matches {artist_name.lower()}')
 
 def get_lyrics_wikia(song_title, artist_name):
     url = 'http://lyric-api.herokuapp.com/api/find/' + artist_name.replace(' ', '%20') + '/' + song_title.replace(' ', '%20')
@@ -756,6 +806,15 @@ if __name__=='__main__':
 
     ARTISTS, FUTURE_ARTISTS, SEED_ARTISTS, ALBUMS, TRACKS = get_dataframes()
     backup_dataframes()
+
+    if args.print_top_genres:
+        top_genres = [
+            'classic rock', 'alternative rock', 'indie rock', 'rock', 'pop', 'rap', 'hip hop', 
+            'punk', 'experimental', 'soul', 'electronic', 'funk', 'r&b', 'christmas',
+            'rockabilly', 'grunge', 'industrial', 'reggae', 'country', 'blues', 'emo', 'video game music',
+            'ska', 'jazz', 'disco', 'edm', 'doo-wop', 'lo-fi', 'metal', 'folk', 'soundtrack'
+        ]
+        print_top_genres(ARTISTS, top_genres)
 
     if args.seeds is not None:
         printlog(f'Adding {args.seeds} to seed_artists list...')
