@@ -197,11 +197,17 @@ def get_lyrics_genius(song_title, artist_name):
         page = requests.get(song_url)
         html = BeautifulSoup(page.text, 'html.parser')
         lyrics = html.find('div', class_='lyrics').get_text()
-        lyrics = re.sub(re.compile('\\[Verse \\d\\]|\\[Verse\\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile('\\[Chorus \\d\\]|\\[Chorus\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile('\\[Bridge \\d\\]|\\[Bridge\\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile('\\[Outro \\d\\]|\\[Outro\\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile('^(\\n)*|(\\n)*$'), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Verse \d\]|\[Verse\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Chorus \d\]|\[Chorus\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Pre-Chorus \d\]|\[Pre-Chorus\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Bridge \d\]|\[Bridge\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Outro \d\]|\[Outro\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Pre-Chorus \d\]|\[Pre-Chorus\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Hook \d\]|\[Hook\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Sample \d\]|\[Sample\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Refrain \d\]|\[Refrain\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'\[Intro \d\]|\[Intro\]', re.IGNORECASE), '', lyrics)
+        lyrics = re.sub(re.compile(r'^(\n)*|(\n)*$'), '', lyrics)
         return lyrics
     else:
         raise Exception(f'Artist not found, no hit from {hits} matches {artist_name.lower()}')
@@ -296,6 +302,9 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
     album_covers = {}
 
     for track in res_home['tracks']:
+        if track['preview_url'] is None:
+            break
+            
         try:
             lyrics = get_track_lyrics(track['name'], artist_name)
         except Exception:
@@ -327,6 +336,9 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
             album_covers[track['album']['id']] = track['album']['images'][0]['url']
 
     for track in res_US['tracks']:
+        if track['preview_url'] is None:
+            break
+                
         if track['id'] in previews:
             if previews[track['id']] is None:
                 try:
@@ -390,6 +402,123 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
                 album_covers[track['album']['id']] = track['album']['images'][0]['url']
 
     return tracks, albums, lyrics_list, previews, album_covers
+
+def fr_get_all_tracks(country, artist_name, artist_id):
+    # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
+    col =  ['artist_id', 'name', 'release_date', 'release_date_precision']
+    albums = pd.DataFrame(columns=col)
+
+    # id: {artist_id: '', album_id: '', name: ''}
+    col =  ['artist_id', 'album_id', 'name']
+    tracks = pd.DataFrame(columns=col)
+
+    lyrics_list = {}
+    previews = {}
+    album_covers = {}
+
+    result_albums = SPOTIFY.artist_albums(artist_id, limit=50)
+
+    dups = re.compile(r'Deluxe|Remastered|Remaster|Live|Version|Edition')
+
+    albums_markets = {}
+    album_names = []
+    for album in result_albums['items']:
+        if not dups.search(album['name']) and album['name'].lower() not in album_names:
+            if album['album_type'] in ['album', 'single']:
+                markets = []
+                if country in album['available_markets']:
+                    markets.append(country)
+                if 'US' in album['available_markets'] and country != 'US':
+                    markets.append('US')
+                markets.extend(random.choices(album['available_markets'], k=3-len(markets)))
+
+                albums_markets[album['id']] = {
+                    'markets': set(markets), 
+                    'artist_id': album['artists'][0]['id'], 
+                    'name': album['name'], 
+                    'release_date': album['release_date'], 
+                    'release_date_precision': album['release_date_precision'],
+                    'img_url':album['images'][0]['url']
+                }
+                album_names.append(album['name'].lower())
+
+    for album_id, album in albums_markets.items():
+        printlog(f'Album: {album["name"]}')
+        
+        result_tracks_albums = SPOTIFY.album_tracks('6i6folBtxKV28WX3msQ4FE')
+        tracks_without_previews = []
+        for track in result_tracks_albums['items']:
+            if track['id'] not in previews:
+                if track['preview_url'] is None:
+                    tracks_without_previews.append(track['id'])
+                else:
+                    try:
+                        lyrics = get_track_lyrics(track['name'], artist_name)
+                    except Exception:
+                        continue
+
+                    if lyrics is not None:
+                        printlog(
+                            str(track['id']) +
+                            ' : ' + str(track['name'])
+                        )
+                        tracks.loc[track['id']] = [artist_id, album_id, track['name']]
+
+                        if album_id not in albums.index:
+                            printlog(
+                                str(album_id) +
+                                ' : ' + str(album['name']) +
+                                ' : ' + str(album['release_date']) +
+                                ' : ' + str(album['release_date_precision'])
+                            )
+                            albums.loc[album_id] = [
+                                artist_id, 
+                                album['name'], 
+                                album['release_date'], 
+                                album['release_date_precision']
+                            ]
+
+                        lyrics_list[track['id']] = lyrics
+                        previews[track['id']] = track['preview_url']
+                        album_covers[album_id] = album['img_url']
+
+        for market in album['markets']:
+            res_tracks = SPOTIFY.tracks(tracks_without_previews, market=market)
+            for track in res_tracks['tracks']:
+                if track['id'] not in previews and track['preview_url'] is not None:
+                    try:
+                        lyrics = get_track_lyrics(track['name'], artist_name)
+                    except Exception:
+                        continue
+
+                    if lyrics is not None:
+                        printlog(
+                            str(track['id']) +
+                            ' : ' + str(track['name'])
+                        )
+                        tracks.loc[track['id']] = [artist_id, album_id, track['name']]
+
+                        if album_id not in albums.index:
+                            printlog(
+                                str(album_id) +
+                                ' : ' + str(album['name']) +
+                                ' : ' + str(album['release_date']) +
+                                ' : ' + str(album['release_date_precision'])
+                            )
+                            albums.loc[album_id] = [
+                                artist_id, 
+                                album['name'], 
+                                album['release_date'], 
+                                album['release_date_precision']
+                            ]
+
+                        lyrics_list[track['id']] = lyrics
+                        previews[track['id']] = track['preview_url']
+                        album_covers[album_id] = album['img_url']
+    if len(tracks) == 0:
+        return fr_get_top_tracks_albums(country, artist_name, artist_id)
+    else:
+        return tracks, albums, lyrics_list, previews, album_covers 
 
 ####### Location #######
 def get_lat_long(location):
@@ -473,31 +602,34 @@ def get_metadata_mm(artist_name):
 
 def get_metadata_mb(artist_name):
     result = musicbrainzngs.search_artists(artist=artist_name)
-    
+
     mb_id, area1, area2, area3 = None, '', '', ''
-    
+
     for artist in result['artist-list']:
         if artist['name'].lower() == artist_name.lower():
             prtstr = ''
             if 'id' in artist:
                 mb_id = artist['id']
                 prtstr = prtstr + artist['id'] + ' : '
-            if 'name' in artist['begin-area']:
-                area1 = str(artist['begin-area']['name'])
-                prtstr = prtstr + area1 + ' : '
-            if 'name' in artist['area']:
-                area2 = str(artist['area']['name'])
-                prtstr = prtstr + area2 + ' : ' 
+            if 'begin-area' in artist:
+                if 'name' in artist['begin-area']:
+                    area1 = str(artist['begin-area']['name'])
+                    prtstr = prtstr + area1 + ' : '
+            if 'area' in artist:
+                if 'name' in artist['area']:
+                    area2 = str(artist['area']['name'])
+                    prtstr = prtstr + area2 + ' : ' 
             if 'country' in artist:
                 area3 = str(artist['country'])
                 prtstr = prtstr + area3 + ' : ' 
             printlog(f'get_metadata_mb({artist_name}) results: {prtstr}')
-            
+            break
+
     try:
         area3 = pycountry.countries.lookup(area3).name
     except Exception: 
         pass
-    
+
     return mb_id, area1, area2, area3
 
 def get_metadata_mb_id(mb_id, artist_name):
@@ -532,12 +664,12 @@ def get_metadata_mb_id(mb_id, artist_name):
 
 def get_artist_location(artist_name):
     mb, wiki, mm = False, False, False
-    mb_id, mb_wid, mm_id, area1, area2 = None, None, None, None, None  
+    mb_wid, area1, area2 = None, None, None
     area3, origin, born, country, location = None, None, None, None, None 
     
     printlog('Try MusicBrainz...')
     try:
-        mb_id, area1, area2, area3 = get_metadata_mb(artist_name)
+        _, area1, area2, area3 = get_metadata_mb(artist_name)
         mb = True
     except Exception:
         printlog('MusicBrainz entry not found, try Wikipedia...', e=True)
@@ -672,6 +804,8 @@ if __name__=='__main__':
 
             printlog(f'Related added to seed_artists list.')
 
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+
         except Exception:
             printlog(f'Exception occured adding related artists to seeds!', e=True)
             break
@@ -683,6 +817,8 @@ if __name__=='__main__':
             mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id)
 
             printlog(f'{seed_artist_id} marked as scraped.')
+
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
@@ -696,6 +832,8 @@ if __name__=='__main__':
                 add_artist(df=FUTURE_ARTISTS, artist_id=index, name=row['name'], genres=row['genres'], related=None, lat=None, lng=None)
 
             printlog(f'Success adding related artists metadata to future artists.')
+
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured adding related artists metadata to future artists.!', e=True)
@@ -754,7 +892,7 @@ if __name__=='__main__':
             # id: preview url (.mp3)
             # id: album cover ulr (.jpg)
 
-            printlog(f'Getting the top tracks for seed artist...')
+            printlog(f'Getting top tracks for seed artist...')
 
             tracks, albums, lyrics, previews, album_covers = fr_get_top_tracks_albums(
                 country=country, 
