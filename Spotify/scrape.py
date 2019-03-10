@@ -61,6 +61,7 @@ SPOTIFY = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 parser = argparse.ArgumentParser(description="scrapes various apis for music content")
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
 parser.add_argument('-s', '--seeds', default=None, help='injects seed artists via comma separated list')
+parser.add_argument('-t', '--seeds-top', default=False, help='inject seeds at the top of the list')
 parser.add_argument('-p', '--print-top-genres', default=False, help='prints top genres sorted by count')
 args = parser.parse_args()
 
@@ -175,10 +176,16 @@ def print_top_genres(ARTISTS, top_genres):
 
 
 ####### Data #######
-def inject_seed_artists(df, list_ids):
-    for i in list_ids:
-        if i not in df.index:
-            df.loc[i] = False
+def inject_seed_artists(df, list_ids, top=False):
+    if top:
+        df_top = pd.DataFrame(columns=['has_been_scraped'])
+        for i in list_ids:
+            df_top.loc[i] = False
+        return pd.concat([df_top, df])
+    else:
+        for i in list_ids:
+            if i not in df.index:
+                df.loc[i] = False
             
 def get_next_seed_artist(seed_artists):
     try:
@@ -819,7 +826,7 @@ if __name__=='__main__':
     if args.seeds is not None:
         printlog(f'Adding {args.seeds} to seed_artists list...')
         try:
-            inject_seed_artists(df=SEED_ARTISTS, list_ids=args.seeds.split(','))
+            SEED_ARTISTS = inject_seed_artists(df=SEED_ARTISTS, list_ids=args.seeds.split(','), top=args.seeds_top)
             save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
         except Exception:
             printlog(f'Exception occured, could not add seeds {args.seeds}.hdf5', e=True)
@@ -904,6 +911,7 @@ if __name__=='__main__':
             printlog(f'Getting metadata for seed artist with ID: {seed_artist_id}...') 
 
             printlog(f'Check if its been loaded into future artists before...') 
+
             if seed_artist_id in FUTURE_ARTISTS.index:
                 printlog(f'Getting metadata from future artists...') 
                 artist_metadata = FUTURE_ARTISTS.loc[[seed_artist_id]]
