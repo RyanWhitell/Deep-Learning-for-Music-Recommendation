@@ -63,6 +63,7 @@ parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_
 parser.add_argument('-s', '--seeds', default=None, help='injects seed artists via comma separated list')
 parser.add_argument('-t', '--seeds-top', default=False, help='inject seeds at the top of the list')
 parser.add_argument('-r', '--seeds-reset', default=False, help='reset seed artists that failed so they can run a second time')
+parser.add_argument('-u', '--set-seed-unscraped', default=None, help='sets a seed as unscraped')
 parser.add_argument('-p', '--print-top-genres', default=False, help='prints top genres sorted by count')
 args = parser.parse_args()
 
@@ -199,6 +200,9 @@ def get_next_seed_artist(seed_artists):
 
 def mark_seed_as_scraped(df, seed_artist_id):
     df.loc[seed_artist_id] = True
+
+def mark_seed_as_unscraped(df, seed_artist_id):
+    df.loc[seed_artist_id] = False
 
 def add_artist(df, artist_id, name, genres, related, lat, lng):
     if artist_id not in df.index:
@@ -856,8 +860,21 @@ if __name__=='__main__':
         print_top_genres(df=ARTISTS, top_genres=top_genres)
 
     if args.seeds_reset:
-        reset_failed_seed_artists(seed=SEED_ARTISTS, artists=ARTISTS)
-        save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+        printlog(f'Marking seeds that failed as unscraped....')
+        try:
+            reset_failed_seed_artists(seed=SEED_ARTISTS, artists=ARTISTS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+        except Exception:
+            printlog(f'Exception occured, could not mark failed seeds as unscraped', e=True)
+
+    if args.set_seed_unscraped is not None:
+        printlog(f'Marking seed {args.set_seed_unscraped} as unscraped....')
+        try:
+            mark_seed_as_unscraped(df=SEED_ARTISTS, seed_artist_id=args.set_seed_unscraped)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+        except Exception:
+            printlog(f'Exception occured, could not mark seed as unscraped', e=True)
+
 
     if args.seeds is not None:
         printlog(f'Adding {args.seeds} to seed_artists list...')
@@ -865,7 +882,7 @@ if __name__=='__main__':
             SEED_ARTISTS = inject_seed_artists(df=SEED_ARTISTS, list_ids=args.seeds.split(','), top=args.seeds_top)
             save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
         except Exception:
-            printlog(f'Exception occured, could not add seeds {args.seeds}.hdf5', e=True)
+            printlog(f'Exception occured, could not add seeds {args.seeds}', e=True)
 
     num_seed_artists = int(args.num_seed_artists)
 

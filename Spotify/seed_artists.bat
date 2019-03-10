@@ -83,5 +83,5 @@ python scrape.py -s=0k17h0D3J5VfsdmQ1iZtE9
 python scrape.py -s=7nwUJBm0HE4ZxD3f5cy5ok
 
 :: Grunge
-:: Aretha Franklin 'alternative rock', 'grunge', 'permanent wave', 'post-grunge', 'rock'
+::Nirvana 'alternative rock', 'grunge', 'permanent wave', 'post-grunge', 'rock'
 python scrape.py -s=6olE6TJLqED3rqDCT0FyPh
