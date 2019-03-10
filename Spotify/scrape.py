@@ -394,7 +394,17 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
 
             lyrics_list[track['id']] = lyrics
             previews[track['id']] = track['preview_url']
-            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+            if track['album']['id'] not in album_covers:
+                try:
+                    album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                except:
+                    album_covers[track['album']['id']] = None
+            elif album_covers[track['album']['id']] is None:
+                try:
+                    album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                except:
+                    album_covers[track['album']['id']] = None
+                
 
     for track in res_US['tracks']:
         if track['preview_url'] is None:
@@ -430,7 +440,16 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
 
                     lyrics_list[track['id']] = lyrics
                     previews[track['id']] = track['preview_url']
-                    album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                    if track['album']['id'] not in album_covers:
+                        try:
+                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                        except:
+                            album_covers[track['album']['id']] = None
+                    elif album_covers[track['album']['id']] is None:
+                        try:
+                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                        except:
+                            album_covers[track['album']['id']] = None
         else:
             try:
                 lyrics = get_track_lyrics(track['name'], artist_name)
@@ -460,7 +479,16 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
 
                 lyrics_list[track['id']] = lyrics
                 previews[track['id']] = track['preview_url']
-                album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                if track['album']['id'] not in album_covers:
+                    try:
+                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                    except:
+                        album_covers[track['album']['id']] = None
+                elif album_covers[track['album']['id']] is None:
+                    try:
+                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                    except:
+                        album_covers[track['album']['id']] = None
 
     return tracks, albums, lyrics_list, previews, album_covers
 
