@@ -18,7 +18,7 @@ import FMA
 
 parser = argparse.ArgumentParser(description="extracts features")
 parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
-parser.add_argument('-f', '--features', required=True, help='which features to extract: stft, mel_scaled_stft')
+parser.add_argument('-f', '--features', required=True, help='which features to extract: stft, mel_scaled_stft, cqt, chroma')
 parser.add_argument('-q', '--quick', default=False, help='runs each extraction quickly to ensure they will extract')
 args = parser.parse_args()
 
@@ -62,8 +62,8 @@ def get_fma_mel_scaled_stft(track_id):
     sr=22050
     n_fft=4096
     hop_length=1024
-    win_length=4096
-    window='hann'
+    #win_length=4096
+    #window='hann'
     
     tid_str = '{:06d}'.format(track_id)
     file_path = os.path.join('Data/fma_large', tid_str[:3], tid_str + '.mp3')
@@ -88,6 +88,8 @@ def extract_fma_mel_scaled_stft(ids, fma_set, quick):
         data[str(i)] = spec
 
     f.close()
+
+
 
 
 def get_fma_cqt(track_id):
@@ -124,6 +126,45 @@ def extract_fma_cqt(ids, fma_set, quick):
     f.close()
 
 
+def get_fma_chroma(track_id):
+    scaler = sklearn.preprocessing.StandardScaler()
+
+    # cqt:
+    sr=22050
+    #?n_fft=4096
+    hop_length=1024
+    #?win_length=4096
+    #window='hann'
+    #n_bins=n_octaves * bins_per_octave,
+    bins_per_octave=12*2
+
+    # fold:
+    # n_chroma=12
+    # n_octaves=7
+
+    tid_str = '{:06d}'.format(track_id)
+    file_path = os.path.join('Data/fma_large', tid_str[:3], tid_str + '.mp3')
+
+    y, _ = lr.load(path=file_path, sr=sr)
+    
+    chroma = lr.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, bins_per_octave=bins_per_octave)
+    
+    return track_id, scaler.fit_transform(chroma[:,:643])
+
+def extract_fma_chroma(ids, fma_set, quick):
+    if quick:
+        ids = ids[:100]
+        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_chroma.hdf5', 'a')
+    else:
+        f = h5py.File('./Data/features/fma_' + fma_set + '_chroma.hdf5', 'a')
+
+    data = f.create_group('data')
+    
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    for i, spec in tqdm(pool.imap_unordered(get_fma_chroma, ids), total=len(ids)):
+        data[str(i)] = spec
+
+    f.close()
 
 
 if __name__=='__main__':
@@ -140,5 +181,7 @@ if __name__=='__main__':
             extract_fma_mel_scaled_stft(ids, 'med', args.quick)
         if args.features == 'cqt':
             extract_fma_cqt(ids, 'med', args.quick)
+        if args.features == 'chroma':
+            extract_fma_chroma(ids, 'med', args.quick)
 
     print(f'Total file execution time: {time.perf_counter()-file_start:.2f}s')
