@@ -351,9 +351,6 @@ def get_track_lyrics(song_title, artist_name):
 
 ####### Track #######
 def fr_get_top_tracks_albums(country, artist_name, artist_id):  
-    res_home = SPOTIFY.artist_top_tracks(seed_artist_id, country=country)
-    res_US = SPOTIFY.artist_top_tracks(seed_artist_id, country='US')
-
     # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
     col =  ['artist_id', 'name', 'release_date', 'release_date_precision']
     albums = pd.DataFrame(columns=col)
@@ -365,51 +362,53 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
     lyrics_list = {}
     previews = {}
     album_covers = {}
+    
+    if country is not None:
+        res_home = SPOTIFY.artist_top_tracks(seed_artist_id, country=country)
+        for track in res_home['tracks']:
+            if track['preview_url'] is None:
+                break
 
-    for track in res_home['tracks']:
-        if track['preview_url'] is None:
-            break
-            
-        try:
-            lyrics = get_track_lyrics(track['name'], artist_name)
-        except Exception:
-            continue
+            try:
+                lyrics = get_track_lyrics(track['name'], artist_name)
+            except Exception:
+                continue
 
-        if lyrics is not None:
-            printlog(
-                str(track['id']) +
-                ' : ' + str(track['name'])
-            )
-            tracks.loc[track['id']] = [artist_id, track['album']['id'], track['name']]
-
-            if track['album']['id'] not in albums.index:
+            if lyrics is not None:
                 printlog(
-                    str(track['album']['id']) +
-                    ' : ' + str(track['album']['name']) +
-                    ' : ' + str(track['album']['release_date']) +
-                    ' : ' + str(track['album']['release_date_precision'])
+                    str(track['id']) +
+                    ' : ' + str(track['name'])
                 )
-                albums.loc[track['album']['id']] = [
-                    artist_id, 
-                    track['album']['name'], 
-                    track['album']['release_date'], 
-                    track['album']['release_date_precision']
-                ]
+                tracks.loc[track['id']] = [artist_id, track['album']['id'], track['name']]
 
-            lyrics_list[track['id']] = lyrics
-            previews[track['id']] = track['preview_url']
-            if track['album']['id'] not in album_covers:
-                try:
-                    album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                except:
-                    album_covers[track['album']['id']] = None
-            elif album_covers[track['album']['id']] is None:
-                try:
-                    album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                except:
-                    album_covers[track['album']['id']] = None
+                if track['album']['id'] not in albums.index:
+                    printlog(
+                        str(track['album']['id']) +
+                        ' : ' + str(track['album']['name']) +
+                        ' : ' + str(track['album']['release_date']) +
+                        ' : ' + str(track['album']['release_date_precision'])
+                    )
+                    albums.loc[track['album']['id']] = [
+                        artist_id, 
+                        track['album']['name'], 
+                        track['album']['release_date'], 
+                        track['album']['release_date_precision']
+                    ]
+
+                lyrics_list[track['id']] = lyrics
+                previews[track['id']] = track['preview_url']
+                if track['album']['id'] not in album_covers:
+                    try:
+                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                    except:
+                        album_covers[track['album']['id']] = None
+                elif album_covers[track['album']['id']] is None:
+                    try:
+                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                    except:
+                        album_covers[track['album']['id']] = None
                 
-
+    res_US = SPOTIFY.artist_top_tracks(seed_artist_id, country='US')
     for track in res_US['tracks']:
         if track['preview_url'] is None:
             break
