@@ -852,8 +852,8 @@ if __name__=='__main__':
 
     if args.print_top_genres:
         top_genres = [
-            'classic rock', 'alternative rock', 'indie rock', 'rock', 'pop', 'rap', 'hip hop', 
-            'punk', 'experimental', 'soul', 'electronic', 'funk', 'r&b', 'christmas',
+            'classic rock', 'alternative rock', 'indie rock', 'psychedelic rock', 'rock', 'dance pop', 'pop', 
+            'punk', 'experimental', 'soul', 'electronic', 'funk', 'r&b', 'christmas', 'hip hop', 'rap', 
             'rockabilly', 'grunge', 'industrial', 'reggae', 'country', 'blues', 'emo', 'video game music',
             'ska', 'jazz', 'disco', 'edm', 'doo-wop', 'lo-fi', 'metal', 'folk', 'soundtrack'
         ]
