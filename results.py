@@ -34,17 +34,9 @@ class DataGenerator(keras.utils.Sequence):
         self.batch_size = batch_size
         self.dim = dim
         self.n_classes = n_classes
-
         self.features = features
         self.dataset = dataset
-
-        if self.features == 'stft_halved':
-            self.data_path = './Data/features/' + dataset + '_stft.hdf5'
-            self.halved = True
-        else: 
-            self.data_path = './Data/features/' + dataset + '_' + features + '.hdf5'
-            self.halved = False
-
+        self.data_path = './Data/features/' + dataset + '_' + features + '.hdf5'
         self.n_channels = n_channels
         self.shuffle = shuffle
         self.on_epoch_end()
@@ -79,10 +71,7 @@ class DataGenerator(keras.utils.Sequence):
 
         with h5py.File(self.data_path) as f:
             for i, ID in enumerate(list_IDs_temp):
-                if self.halved:
-                    X[i,] = f['data'][str(ID)][0:1024,:]
-                else:
-                    X[i,] = f['data'][str(ID)]
+                X[i,] = f['data'][str(ID)]
                 y[i] = self.labels[ID]
             
         return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)

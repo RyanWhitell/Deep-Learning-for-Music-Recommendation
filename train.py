@@ -17,7 +17,7 @@ import FMA
 parser = argparse.ArgumentParser(description="trains a model")
 parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
 parser.add_argument('-t', '--test', required=True, help='test to carry out: sgc')
-parser.add_argument('-f', '--features', required=True, help='which features to use: stft, stft_halved, mel_scaled_stft, cqt')
+parser.add_argument('-f', '--features', required=True, help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
 
@@ -30,17 +30,9 @@ class DataGenerator(keras.utils.Sequence):
         self.batch_size = batch_size
         self.dim = dim
         self.n_classes = n_classes
-
         self.features = features
         self.dataset = dataset
-
-        if self.features == 'stft_halved':
-            self.data_path = './Data/features/' + dataset + '_stft.hdf5'
-            self.halved = True
-        else: 
-            self.data_path = './Data/features/' + dataset + '_' + features + '.hdf5'
-            self.halved = False
-
+        self.data_path = './Data/features/' + dataset + '_' + features + '.hdf5'
         self.n_channels = n_channels
         self.shuffle = shuffle
         self.on_epoch_end()
@@ -75,10 +67,7 @@ class DataGenerator(keras.utils.Sequence):
 
         with h5py.File(self.data_path) as f:
             for i, ID in enumerate(list_IDs_temp):
-                if self.halved:
-                    X[i,] = f['data'][str(ID)][0:1024,:]
-                else:
-                    X[i,] = f['data'][str(ID)]
+                X[i,] = f['data'][str(ID)]
                 y[i] = self.labels[ID]
             
         return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)
