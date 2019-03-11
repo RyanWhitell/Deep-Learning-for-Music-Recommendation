@@ -72,7 +72,7 @@ def get_fma_mel_scaled_stft(track_id):
     
     mel_spec = lr.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=256)
     
-    return track_id, scaler.fit_transform(mel_spec[:,:643])
+    return track_id, scaler.fit_transform(lr.power_to_db(mel_spec[:,:643]))
 
 def extract_fma_mel_scaled_stft(ids, fma_set, quick):
     if quick:
