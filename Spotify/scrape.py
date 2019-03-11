@@ -896,10 +896,12 @@ if __name__=='__main__':
 
             if seed_artist_id == -1:
                 printlog('All seed_artists have been scraped, add more seed artists!')
+                backup_dataframes()
                 break
 
         except Exception:
             printlog('Exception occured getting next artist!', e=True)
+            backup_dataframes()
             break
 
         ################## Get related artists ##########################################
@@ -913,6 +915,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog('Exception occured getting related artists!', e=True)
+            backup_dataframes()
             break
 
         ################## Add related artists to seed artists ##########################
@@ -927,6 +930,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog(f'Exception occured adding related artists to seeds!', e=True)
+            backup_dataframes()
             break
 
         ################## Mark seed artist as scraped ##################################
@@ -941,6 +945,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
+            backup_dataframes()
             break
 
         ################## Add related artist metadata to future artists ################
@@ -956,6 +961,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog(f'Exception occured adding related artists metadata to future artists.!', e=True)
+            backup_dataframes()
             break
 
         ################## Get metadata for seed artist #################################
@@ -980,6 +986,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog('Exception occured getting metadata!', e=True)
+            backup_dataframes()
             break
 
         ################## Get location #################################################
@@ -1001,6 +1008,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
+            backup_dataframes()
             break
     
         ################## Get top tracks and albums ####################################
@@ -1027,6 +1035,7 @@ if __name__=='__main__':
 
         except Exception:
             printlog('Exception occured getting tracks and albums!', e=True)
+            backup_dataframes()
             break
 
         ################## Download album art ###########################################
@@ -1181,6 +1190,13 @@ if __name__=='__main__':
             printlog('Some tracks point to albums that dont exist:')
             printlog(set(TRACKS.album_id.values).symmetric_difference(set(ALBUMS.index.values)))
             integrityIsGood = False
+
+        for album in [n for n in glob.glob("./albums/temp/*.jpg")]:
+            os.remove(album)
+        for audio in [n for n in glob.glob("./audio/temp/*.mp3")]:
+            os.remove(audio)
+        for lyric in [n for n in glob.glob("./lyrics/temp/*.txt")]:
+            os.remove(lyric)
 
         if integrityIsGood:
             num_seed_artists -= 1
