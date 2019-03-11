@@ -162,6 +162,10 @@ if __name__ == '__main__':
         freq, time = 168, 643
         dim = (freq, time)
 
+    if args.features == 'chroma':
+        freq, time = 12, 643
+        dim = (freq, time)
+
     results = pd.DataFrame({
         'name':['Time','Freq','Simple','TimeFreq']
     })
