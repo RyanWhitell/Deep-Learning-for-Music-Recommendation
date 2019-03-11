@@ -169,27 +169,32 @@ def train_model(model, model_name, dim, features, dataset, quick):
 def Simple(features, input_shape, num_classes):
     inputs = layers.Input(shape=input_shape)
 
+    if features in ['chroma']:
+        pad = 'same'
+    else:
+        pad = 'valid'
+
     ############## INPUT LAYER ##############
     x = layers.Conv2D(8, (3, 3), strides=(2, 2), use_bias=False, padding='same', name='input1_1')(inputs)
     x = layers.BatchNormalization(name='input1_1_bn')(x)
     x = layers.Activation('relu', name='input1_1_relu')(x)
 
-    if features == 'stft' or features == 'stft_halved':
+    if features in ['stft', 'stft_halved']:
         x = layers.Conv2D(16, (3, 3), strides=(2, 2), use_bias=False, padding='same', name='input1_2')(x)
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
     
-    if features == 'mel_scaled_stft' or features == 'cqt':
+    if features in ['mel_scaled_stft', 'cqt', 'chroma']:
         x = layers.Conv2D(16, (3, 3), strides=(1, 1), use_bias=False, name='input1_2')(x)
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
 
     ############## HIDDEN LAYER 1  ##############
-    x = layers.SeparableConv2D(32, (3, 3), use_bias=False, name='block1_1')(x)
+    x = layers.SeparableConv2D(32, (3, 3), use_bias=False, padding=pad, name='block1_1')(x)
     x = layers.BatchNormalization(name='block1_1_bn')(x)
     x = layers.Activation('relu', name='block1_1_relu')(x)
 
-    x = layers.SeparableConv2D(64, (3, 3), use_bias=False, name='block1_2')(x)
+    x = layers.SeparableConv2D(64, (3, 3), use_bias=False, padding=pad, name='block1_2')(x)
     x = layers.BatchNormalization(name='block1_2_bn')(x)
  
     x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block1_mp')(x)
@@ -197,7 +202,7 @@ def Simple(features, input_shape, num_classes):
     x = layers.Activation('relu', name='block1_2_relu')(x)
     
     ############## HIDDEN LAYER 2  ##############
-    x = layers.SeparableConv2D(128, (3, 3), use_bias=False, name='block2')(x)
+    x = layers.SeparableConv2D(128, (3, 3), use_bias=False, padding=pad, name='block2')(x)
     x = layers.BatchNormalization(name='block2_bn')(x)
 
     x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_mp')(x)
@@ -205,7 +210,7 @@ def Simple(features, input_shape, num_classes):
     x = layers.Activation('relu', name='block2_relu')(x)
     
     ############## HIDDEN LAYER 3  ##############
-    x = layers.SeparableConv2D(256, (3, 3), use_bias=False, name='block3')(x)
+    x = layers.SeparableConv2D(256, (3, 3), use_bias=False, padding=pad, name='block3')(x)
     x = layers.BatchNormalization(name='block3_bn')(x)
 
     x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block3_mp')(x)
@@ -213,7 +218,7 @@ def Simple(features, input_shape, num_classes):
     x = layers.Activation('relu', name='block3_relu')(x)
     
     ############## HIDDEN LAYER 4  ##############
-    x = layers.SeparableConv2D(512, (3, 3), use_bias=False, name='block4')(x)
+    x = layers.SeparableConv2D(512, (3, 3), use_bias=False, padding=pad, name='block4')(x)
     x = layers.BatchNormalization(name='block4_bn')(x)
 
     x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block4_mp')(x)
@@ -221,7 +226,7 @@ def Simple(features, input_shape, num_classes):
     x = layers.Activation('relu', name='block4_relu')(x)
     
     ############## OUTPUT LAYER ##############
-    x = layers.SeparableConv2D(1024, (3, 3), use_bias=False, name='out')(x)
+    x = layers.SeparableConv2D(1024, (3, 3), use_bias=False, padding=pad, name='out')(x)
     x = layers.BatchNormalization(name='out_bn')(x)
     x = layers.Activation('relu', name='out_relu')(x)
         
@@ -233,7 +238,7 @@ def Simple(features, input_shape, num_classes):
 
     return Model(inputs=inputs, outputs=pred)
 
-def Time(iks, input_shape, num_classes):
+def Time(features, iks, input_shape, num_classes):
     time = input_shape[1]
 
     inputs = layers.Input(shape=input_shape)
@@ -269,7 +274,10 @@ def Time(iks, input_shape, num_classes):
     x = layers.SeparableConv2D(16, (1, 9), use_bias=False, name='block1')(x)
     x = layers.BatchNormalization(name='block1_bn')(x)
 
-    x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block1_mp_freq')(x)
+    if features in ['chroma']:
+        x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block1_mp_freq')(x)
+    else:
+        x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block1_mp_freq')(x)
 
     x = layers.Activation('relu', name='block1_relu')(x)
 
@@ -277,7 +285,10 @@ def Time(iks, input_shape, num_classes):
     x = layers.SeparableConv2D(32, (1, 9), use_bias=False, name='block2')(x)
     x = layers.BatchNormalization(name='block2_bn')(x)
 
-    x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block2_mp_freq')(x)
+    if features in ['chroma']:
+        x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block2_mp_freq')(x)
+    else:
+        x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block2_mp_freq')(x)
 
     x = layers.Activation('relu', name='block2_relu')(x)
 
@@ -285,7 +296,10 @@ def Time(iks, input_shape, num_classes):
     x = layers.SeparableConv2D(64, (1, 9), use_bias=False, name='block3')(x)
     x = layers.BatchNormalization(name='block3_bn')(x)
 
-    x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block3_mp_freq')(x)
+    if features in ['chroma']:
+        x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block3_mp_freq')(x)
+    else:
+        x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block3_mp_freq')(x)
 
     x = layers.Activation('relu', name='block3_relu')(x)
     
@@ -306,40 +320,45 @@ def Time(iks, input_shape, num_classes):
 
     return Model(inputs=inputs, outputs=pred)
 
-def Freq(iks, input_shape, num_classes):
+def Freq(features, iks, input_shape, num_classes):
     freq = input_shape[0]
     
     inputs = layers.Input(shape=input_shape)
 
+    if features in ['chroma']:
+        s, f, pad = 1, 3, 'same'
+    else:
+        s, f, pad = 2, 9, 'valid'
+
     ############## INPUT LAYER ##############
-    h1 = layers.Conv2D(2, (freq//iks[0], 1), strides=(2, 1), use_bias=False, padding='same', name='input_over_' + str(iks[0]))(inputs)
+    h1 = layers.Conv2D(2, (freq//iks[0], 1), strides=(s, 1), use_bias=False, padding='same', name='input_over_' + str(iks[0]))(inputs)
     h1 = layers.BatchNormalization(name='input_over_' + str(iks[0]) + '_bn')(h1)
     h1 = layers.Activation('relu', name='input_over_' + str(iks[0]) + '_relu')(h1)
     
-    h2 = layers.Conv2D(2, (freq//iks[1], 1), strides=(2, 1), use_bias=False, padding='same', name='input_over_' + str(iks[1]))(inputs)
+    h2 = layers.Conv2D(2, (freq//iks[1], 1), strides=(s, 1), use_bias=False, padding='same', name='input_over_' + str(iks[1]))(inputs)
     h2 = layers.BatchNormalization(name='input_over_' + str(iks[1]) + '_bn')(h2)
     h2 = layers.Activation('relu', name='input_over_' + str(iks[1]) + '_relu')(h2)
     
-    h3 = layers.Conv2D(2, (freq//iks[2], 1), strides=(2, 1), use_bias=False, padding='same', name='input_over_' + str(iks[2]))(inputs)
+    h3 = layers.Conv2D(2, (freq//iks[2], 1), strides=(s, 1), use_bias=False, padding='same', name='input_over_' + str(iks[2]))(inputs)
     h3 = layers.BatchNormalization(name='input_over_' + str(iks[2]) + '_bn')(h3)
     h3 = layers.Activation('relu', name='input_over_' + str(iks[2]) + '_relu')(h3)
     
-    h4 = layers.Conv2D(2, (freq//iks[3], 1), strides=(2, 1), use_bias=False, padding='same', name='input_over_' + str(iks[3]))(inputs)
+    h4 = layers.Conv2D(2, (freq//iks[3], 1), strides=(s, 1), use_bias=False, padding='same', name='input_over_' + str(iks[3]))(inputs)
     h4 = layers.BatchNormalization(name='input_over_' + str(iks[3]) + '_bn')(h4)
     h4 = layers.Activation('relu', name='input_over_' + str(iks[3]) + '_relu')(h4)
 
-    h5 = layers.Conv2D(2, (freq//iks[4], 1), strides=(2, 1), use_bias=False, padding='same', name='input_over_' + str(iks[4]))(inputs)
+    h5 = layers.Conv2D(2, (freq//iks[4], 1), strides=(s, 1), use_bias=False, padding='same', name='input_over_' + str(iks[4]))(inputs)
     h5 = layers.BatchNormalization(name='input_over_' + str(iks[4]) + '_bn')(h5)
     h5 = layers.Activation('relu', name='input_over_' + str(iks[4]) + '_relu')(h5)
 
-    h6 = layers.Conv2D(2, (freq//iks[5], 1), strides=(2, 1), use_bias=False, padding='same', name='input_over_' + str(iks[5]))(inputs)
+    h6 = layers.Conv2D(2, (freq//iks[5], 1), strides=(s, 1), use_bias=False, padding='same', name='input_over_' + str(iks[5]))(inputs)
     h6 = layers.BatchNormalization(name='input_over_' + str(iks[5]) + '_bn')(h6)
     h6 = layers.Activation('relu', name='input_over_' + str(iks[5]) + '_relu')(h6)
     
     x = layers.concatenate([h1, h2, h3, h4, h5, h6], axis=3, name='inputs')
 
     ############## HIDDEN LAYER 1  ##############
-    x = layers.SeparableConv2D(16, (9, 1), use_bias=False, name='block1')(x)
+    x = layers.SeparableConv2D(16, (f, 1), use_bias=False, padding=pad, name='block1')(x)
     x = layers.BatchNormalization(name='block1_bn')(x)
 
     x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block1_mp_time')(x)
@@ -347,7 +366,7 @@ def Freq(iks, input_shape, num_classes):
     x = layers.Activation('relu', name='block1_relu')(x)
 
     ############## HIDDEN LAYER 2  ##############
-    x = layers.SeparableConv2D(32, (9, 1), use_bias=False, name='block2')(x)
+    x = layers.SeparableConv2D(32, (f, 1), use_bias=False, padding=pad, name='block2')(x)
     x = layers.BatchNormalization(name='block2_bn')(x)
 
     x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block2_mp_time')(x)
@@ -355,7 +374,7 @@ def Freq(iks, input_shape, num_classes):
     x = layers.Activation('relu', name='block2_relu')(x)
 
     ############## HIDDEN LAYER 3  ##############
-    x = layers.SeparableConv2D(64, (9, 1), use_bias=False, name='block3')(x)
+    x = layers.SeparableConv2D(64, (f, 1), use_bias=False, padding=pad, name='block3')(x)
     x = layers.BatchNormalization(name='block3_bn')(x)
 
     x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block3_mp_time')(x)
@@ -363,7 +382,7 @@ def Freq(iks, input_shape, num_classes):
     x = layers.Activation('relu', name='block3_relu')(x)
 
     ############## OUTPUT LAYER ##############
-    x = layers.SeparableConv2D(128, (9, 1), use_bias=False, name='preflat')(x)
+    x = layers.SeparableConv2D(128, (f, 1), use_bias=False, padding=pad, name='preflat')(x)
     x = layers.BatchNormalization(name='preflat_bn')(x)
     x = layers.Activation('relu', name='preflat_relu')(x)
 
@@ -449,15 +468,21 @@ if __name__ == '__main__':
         fiks = [4, 5, 6, 12, 24, 48]  # 42, 33, 28, 14, 7, 3
         tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
 
+    if args.features == 'chroma':
+        freq, time = 12, 643
+        dim = (freq, time)
+        fiks = [1, 2, 3, 4, 6, 12]  # 12, 6, 4, 3, 2, 1
+        tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
+
     ################ Freq ################
     K.clear_session()
-    model = Freq(iks=fiks, input_shape=(*dim, 1), num_classes=num_classes)
+    model = Freq(features=args.features, iks=fiks, input_shape=(*dim, 1), num_classes=num_classes)
     model.summary()
     train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick) 
 
     ################ Time ################
     K.clear_session()
-    model = Time(iks=tiks, input_shape=(*dim, 1), num_classes=num_classes)
+    model = Time(features=args.features, iks=tiks, input_shape=(*dim, 1), num_classes=num_classes)
     model.summary()
     train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)  
 

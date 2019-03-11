@@ -90,8 +90,6 @@ def extract_fma_mel_scaled_stft(ids, fma_set, quick):
     f.close()
 
 
-
-
 def get_fma_cqt(track_id):
     scaler = sklearn.preprocessing.StandardScaler()
 
