@@ -755,89 +755,41 @@ def get_metadata_mb_id(mb_id, artist_name):
     return mb_id, area1, area2, area3
 
 def get_artist_location(artist_name):
-    mb, wiki, mm = False, False, False
-    mb_wid, area1, area2 = None, None, None
-    area3, origin, born, country, location = None, None, None, None, None 
+    mb_wid, area1, area2, area3, = None, None, None, None
+    origin, born, country, location = None, None, None, None 
     
-    printlog('Try MusicBrainz...')
+    printlog('Try Wikipedia...')
     try:
-        _, area1, area2, area3 = get_metadata_mb(artist_name)
-        mb = True
+        mb_wid, origin, born = get_metadata_wiki(artist_name)
+        if origin is not None:
+            location, country = get_lat_long(origin)
+        elif born is not None:
+            location, country = get_lat_long(born)
+        return location, country
     except Exception:
-        printlog('MusicBrainz entry not found, try Wikipedia...', e=True)
         try:
-            mb_wid, origin, born = get_metadata_wiki(artist_name)
-            wiki = True
-        except Exception:
-            printlog('Wikipedia entry not found, try Musixmatch...', e=True)
-            try:
-                mm_id, country = get_metadata_mm(artist_name)
-                mm = True
-            except Exception:
-                printlog('Nothing found, exit', e=True)
+            if mb_wid is not None:
+                printlog('Failed to get the location from Wikipedia, try MusicBrainz with wiki mb_id...', e=True)
+                _, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
+                location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                 return location, country
-    
-    if mb:
-        printlog('Try to get the location from MusicBrainz...')
-        try:
-            location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
-        except Exception:
-            printlog('Failed to get the location from MusicBrainz, try Wikipedia...', e=True)
-            try:
-                mb_wid, origin, born = get_metadata_wiki(artist_name)
-                if origin is not None:
-                    location, country = get_lat_long(origin)
-                elif born is not None:
-                    location, country = get_lat_long(born)
+            else:
+                raise Exception('mb_wid is None')
+        except Exception:   
+            try:  
+                printlog('Failed to get the location from MusicBrainz with wiki mb_id, try MusicBrainz search...', e=True)
+                _, area1, area2, area3 = get_metadata_mb(artist_name)
+                location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
+                return location, country
             except Exception:
+                printlog('MusicBrainz entry not found, try Musixmatch...', e=True)
                 try:
-                    if mb_wid is not None:
-                        printlog('Failed to get the location from Wikipedia, try MusicBrainz again with wiki mb_id...', e=True)
-                        mb_id, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
-                        location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
-                    else:
-                        raise Exception('mb_wid is None')
-                except Exception:
-                    printlog('Failed to get the location from MusicBrainz with wiki mb_id, try Musixmatch...', e=True)
-                    try:
-                        mm_id, country = get_metadata_mm(artist_name)
-                        location, country = get_lat_long(country)
-                    except Exception:
-                        printlog('Location not found, exit', e=True)
-                        return location, country
-                
-    if wiki:
-        printlog('Try to get the location from Wikipedia...')
-        try:
-            if origin is not None:
-                location, country = get_lat_long(origin)
-            elif born is not None:
-                location, country = get_lat_long(born)
-        except Exception:
-            try:
-                if mb_wid is not None:
-                    printlog('Failed to get the location from Wikipedia, try MusicBrainz again with wiki mb_id...', e=True)
-                    mb_id, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
-                    location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
-                else:
-                    raise Exception('mb_wid is None')
-            except Exception:
-                printlog('Failed to get the location from MusicBrainz with wiki mb_id, try Musixmatch...', e=True)
-                try:
-                    mm_id, country = get_metadata_mm(artist_name)
+                    _, country = get_metadata_mm(artist_name)
                     location, country = get_lat_long(country)
-                except Exception:
-                    printlog('Location not found, exit', e=True)
                     return location, country
-                
-    if mm:
-        printlog('Try to get the location from Musixmatch...')
-        try:
-            mm_id, country = get_metadata_mm(artist_name)
-            location, country = get_lat_long(country)
-        except Exception:
-            printlog('Location not found, exit', e=True)
-            return location, country                 
+                except Exception:
+                    printlog('Nothing found, exit', e=True)
+                    return location, country             
         
     return location, country
 
