@@ -122,4 +122,4 @@ Spotify/audio/*
 Spotify/albums/*
 Spotify/backups/*
 Spotify/dumps/*
-Spotify/all_dumps/*
+/all_dumps/*

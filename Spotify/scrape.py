@@ -71,12 +71,15 @@ for index, row in MSD_ARTIST_LOCATION.iterrows():
 WORLD_CITIES = pd.read_csv(
     './external_datasets/worldcities.csv'
 )
-int_lat, int_lng = [], []
+int_lat, int_lng, mesh = [], [], []
 for index, row in WORLD_CITIES.iterrows():
     int_lat.append(int(row['lat']))
     int_lng.append(int(row['lng']))
+    mesh.append((str(row['city']) + str(row['admin_name']) + str(row['country'])).replace(' ', ''))
+    
 WORLD_CITIES['int_lat'] = int_lat
 WORLD_CITIES['int_lng'] = int_lng
+WORLD_CITIES['mesh'] = mesh
 
 parser = argparse.ArgumentParser(description="scrapes various apis for music content")
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
@@ -344,6 +347,7 @@ def get_lyrics_mm(song_title, artist_name):
     return data['lyrics']['lyrics_body'][:-70]
    
 def get_track_lyrics(song_title, artist_name):
+    printlog(f'Try getting lyrics for {song_title} by {artist_name}')
     printlog('Try Genius...')
     try:
         lyrics = get_lyrics_genius(song_title, artist_name)
@@ -638,6 +642,29 @@ def fr_get_all_tracks(country, artist_name, artist_id):
         return tracks, albums, lyrics_list, previews, album_covers 
 
 ####### Location #######
+def check_world_city_data(born=None, origin=None, area1=None, area2=None):
+    printlog(f'born:{born}, origin:{origin}, area1:{area1}, area2:{area2}')
+    if origin is not None:
+        for _, row in WORLD_CITIES.iterrows():
+            if origin in row['mesh']:
+                return {'lat': row['lat'], 'lng': row['lng']}, row['iso2']
+            elif row['mesh'] in origin:
+                return {'lat': row['lat'], 'lng': row['lng']}, row['iso2']
+            
+    if born is not None:
+        for _, row in WORLD_CITIES.iterrows():
+            if born in row['mesh']:
+                return {'lat': row['lat'], 'lng': row['lng']}, row['iso2']
+            elif row['mesh'] in born:
+                return {'lat': row['lat'], 'lng': row['lng']}, row['iso2']
+            
+    if area1 is not None and area2 is not None:
+        for _, row in WORLD_CITIES.iterrows():
+            if area1.replace(' ', '') in row['mesh'] and area2.replace(' ', '') in row['mesh']:
+                return {'lat': row['lat'], 'lng': row['lng']}, row['iso2']
+    
+    return None, None
+      
 def get_lat_long(location):
     printlog(f'get_lat_long({location})')
     base_url = 'https://maps.googleapis.com/maps/api/geocode/json?address='
@@ -780,6 +807,7 @@ def get_metadata_mb_id(mb_id, artist_name):
     return mb_id, area1, area2, area3
 
 def get_artist_location(artist_name):
+    # $61.30 for 7097 artists 
     mb_wid, area1, area2, area3, = None, None, None, None
     origin, born, country, location = None, None, None, None 
     
@@ -787,68 +815,109 @@ def get_artist_location(artist_name):
     try:
         mb_wid, origin, born = get_metadata_wiki(artist_name)
         if origin is not None:
-            location, country = get_lat_long(origin)
+            location, country = check_world_city_data(origin=origin)
         elif born is not None:
-            location, country = get_lat_long(born)
-        return location, country
+            location, country = check_world_city_data(born=born)
+                 
+        if location is None or country is None:
+            raise Exception('Location could not be found in world city data')
+        else:
+            return location, country
     except Exception:
+        printlog('Try Wikipedia again but add (Band)...')
         try:
-            if mb_wid is not None:
-                printlog('Failed to get the location from Wikipedia, try MusicBrainz with wiki mb_id...', e=True)
-                _, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
-                location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
-                return location, country
+            mb_wid, origin, born = get_metadata_wiki(artist_name + ' (Band)')
+            if origin is not None:
+                location, country = check_world_city_data(origin=origin)
+            elif born is not None:
+                location, country = check_world_city_data(born=born)
+                 
+            if location is None or country is None:
+                raise Exception('Location could not be found in world city data')
             else:
-                raise Exception('mb_wid is None')
-        except Exception:   
-            try:  
-                printlog('Failed to get the location from MusicBrainz with wiki mb_id, try MusicBrainz search...', e=True)
-                _, area1, area2, area3 = get_metadata_mb(artist_name)
-                location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                 return location, country
-            except Exception:
-                try:
-                    printlog('Failed to get the location from MusicBrainz, try MSD', e=True)
-                    data = MSD_ARTIST_LOCATION.loc[MSD_ARTIST_LOCATION.name == artist_name.lower()].values[0]
-                    location = (data[1], data[2])
-
-                    close_cities = WORLD_CITIES.loc[WORLD_CITIES.int_lat == int(location[0])].loc[WORLD_CITIES.int_lng == int(location[1])]
-
-                    if len(close_cities) == 0:
-                        try:
-                            country = pycountry.countries.lookup(data[4]).name
-                        except Exception: 
-                            try:
-                                _, country = get_metadata_mm(artist_name)
-                            except Exception:
-                                pass
-
-                    elif len(close_cities) == 1:
-                        country = close_cities.iso2.values[0]
-
+        except Exception:
+            try:
+                if mb_wid is not None:
+                    printlog('Failed to get the location from Wikipedia, try MusicBrainz with wiki mb_id...', e=True)
+                    _, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
+                 
+                    if area1 is not None and area2 is not None and area1 != '' and area2 != '':
+                        location, country = check_world_city_data(area1=area1, area2=area2)
                     else:
-                        city = None
-                        for tol in [0.0001, 0.001, 0.01, 0.1, 1]:
-                            for index, row in close_cities.iterrows():
-                                if (abs(row['lat'] - location[0]) <= tol) and (abs(row['lng'] - location[1]) <= tol):
-                                    city = row
-                        if city is not None:
-                            country = city.iso2
-                except:
-                    printlog('MusicBrainz entry not found, try Musixmatch...', e=True)
+                         raise Exception('Not enough info for world city data')
+                 
+                    if location is None or country is None:
+                        raise Exception('Location could not be found in world city data')
+                    else:
+                        return location, country
+                else:
+                    raise Exception('mb_wid is None')
+            except Exception:   
+                try:  
+                    printlog('Failed to get the location from MusicBrainz with wiki mb_id, try MusicBrainz search...', e=True)
+                    _, area1, area2, area3 = get_metadata_mb(artist_name)
+                 
+                    if area1 is not None and area2 is not None and area1 != '' and area2 != '':
+                        location, country = check_world_city_data(area1=area1, area2=area2)
+                    else:
+                         raise Exception('Not enough info for world city data')
+                 
+                    if location is None or country is None:
+                        raise Exception('Location could not be found in world city data')
+                    else:
+                        return location, country
+                except Exception:
                     try:
-                        _, country = get_metadata_mm(artist_name)
-                        location, country = get_lat_long(country)
+                        printlog('Failed to get the location from world cities data, use google...', e=True)
+                        if origin is not None:
+                            location, country = get_lat_long(origin)
+                        elif born is not None:
+                            location, country = get_lat_long(born)
+                        else:
+                            location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                         return location, country
                     except Exception:
-                        printlog('Nothing found, exit', e=True)
-                        return location, country             
-        
-    return location, country
+                        try:
+                            printlog('Failed to get the location from google, try MSD', e=True)
+                            data = MSD_ARTIST_LOCATION.loc[MSD_ARTIST_LOCATION.name == artist_name.lower()].values[0]
+                            location = {'lat': data[1], 'lng': data[2]}
 
+                            close_cities = WORLD_CITIES.loc[WORLD_CITIES.int_lat == int(location['lat'])].loc[WORLD_CITIES.int_lng == int(location['lng'])]
+
+                            if len(close_cities) == 0:
+                                try:
+                                    country = pycountry.countries.lookup(data[4]).name
+                                except Exception: 
+                                    try:
+                                        _, country = get_metadata_mm(artist_name)
+                                    except Exception:
+                                        pass
+                            elif len(close_cities) == 1:
+                                country = close_cities.iso2.values[0]
+                            else:
+                                city = None
+                                for tol in [0.0001, 0.001, 0.01, 0.1, 1]:
+                                    for index, row in close_cities.iterrows():
+                                        if (abs(row['lat'] - location['lat']) <= tol) and (abs(row['lng'] - location['lng']) <= tol):
+                                            city = row
+
+                                if city is not None:
+                                    country = city.iso2
+
+                            return location, country
+                        except Exception:
+                            printlog('Last resort, try Musixmatch...', e=True)
+                            try:
+                                _, country = get_metadata_mm(artist_name)
+                                location, country = get_lat_long(country)
+                                return location, country
+                            except Exception:
+                                printlog('Nothing found, exit', e=True)
+                                return location, country
 
 if __name__=='__main__':
-    print('File Start...')
+    printlog('File Start...')
     file_start = time.perf_counter()
 
     ARTISTS, FUTURE_ARTISTS, SEED_ARTISTS, ALBUMS, TRACKS = get_dataframes()
@@ -1204,5 +1273,6 @@ if __name__=='__main__':
 
         if integrityIsGood:
             num_seed_artists -= 1
+            printlog(f'Seed artists left: {num_seed_artists}')
         else:
             break
