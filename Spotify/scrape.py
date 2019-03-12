@@ -58,6 +58,26 @@ musicbrainzngs.set_useragent('haamr', 1.0)
 client_credentials_manager = SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID, client_secret=SPOTIFY_CLIENT_SECRET)
 SPOTIFY = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
+MSD_ARTIST_LOCATION = pd.read_csv(
+    './external_datasets/artist_location.txt', 
+    sep='<SEP>', 
+    header=None, 
+    names=['MSD_Artists_ID', 'lat', 'lng', 'name', 'place'],
+    engine='python'
+)
+for index, row in MSD_ARTIST_LOCATION.iterrows():
+    MSD_ARTIST_LOCATION.loc[index] = [row['MSD_Artists_ID'], row['lat'], row['lng'], row['name'].lower(), str(row['place']).lower()]
+
+WORLD_CITIES = pd.read_csv(
+    './external_datasets/worldcities.csv'
+)
+int_lat, int_lng = [], []
+for index, row in WORLD_CITIES.iterrows():
+    int_lat.append(int(row['lat']))
+    int_lng.append(int(row['lng']))
+WORLD_CITIES['int_lat'] = int_lat
+WORLD_CITIES['int_lng'] = int_lng
+
 parser = argparse.ArgumentParser(description="scrapes various apis for music content")
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
 parser.add_argument('-s', '--seeds', default=None, help='injects seed artists via comma separated list')
@@ -787,14 +807,42 @@ def get_artist_location(artist_name):
                 location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                 return location, country
             except Exception:
-                printlog('MusicBrainz entry not found, try Musixmatch...', e=True)
                 try:
-                    _, country = get_metadata_mm(artist_name)
-                    location, country = get_lat_long(country)
-                    return location, country
-                except Exception:
-                    printlog('Nothing found, exit', e=True)
-                    return location, country             
+                    printlog('Failed to get the location from MusicBrainz, try MSD', e=True)
+                    data = MSD_ARTIST_LOCATION.loc[MSD_ARTIST_LOCATION.name == artist_name.lower()].values[0]
+                    location = (data[1], data[2])
+
+                    close_cities = WORLD_CITIES.loc[WORLD_CITIES.int_lat == int(location[0])].loc[WORLD_CITIES.int_lng == int(location[1])]
+
+                    if len(close_cities) == 0:
+                        try:
+                            country = pycountry.countries.lookup(data[4]).name
+                        except Exception: 
+                            try:
+                                _, country = get_metadata_mm(artist_name)
+                            except Exception:
+                                pass
+
+                    elif len(close_cities) == 1:
+                        country = close_cities.iso2.values[0]
+
+                    else:
+                        city = None
+                        for tol in [0.0001, 0.001, 0.01, 0.1, 1]:
+                            for index, row in close_cities.iterrows():
+                                if (abs(row['lat'] - location[0]) <= tol) and (abs(row['lng'] - location[1]) <= tol):
+                                    city = row
+                        if city is not None:
+                            country = city.iso2
+                except:
+                    printlog('MusicBrainz entry not found, try Musixmatch...', e=True)
+                    try:
+                        _, country = get_metadata_mm(artist_name)
+                        location, country = get_lat_long(country)
+                        return location, country
+                    except Exception:
+                        printlog('Nothing found, exit', e=True)
+                        return location, country             
         
     return location, country
 
