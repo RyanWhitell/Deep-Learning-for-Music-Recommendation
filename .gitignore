@@ -120,6 +120,14 @@ Spotify/API_KEYS.py
 Spotify/lyrics/*
 Spotify/audio/*
 Spotify/albums/*
+Spotify/all_backup/*
 Spotify/backups/*
 Spotify/dumps/*
+Spotify/*.pickle
 /all_dumps/*
+Spotify/external_datasets/*.zip
+Spotify/external_datasets/*.csv
+Spotify/external_datasets/*.xlsx
+Spotify/external_datasets/artist_location.txt
+Spotify/external_datasets/*.pickle
+Spotify/external_datasets/unique_artists.txt

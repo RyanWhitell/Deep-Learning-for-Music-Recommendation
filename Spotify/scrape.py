@@ -58,28 +58,12 @@ musicbrainzngs.set_useragent('haamr', 1.0)
 client_credentials_manager = SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID, client_secret=SPOTIFY_CLIENT_SECRET)
 SPOTIFY = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
-MSD_ARTIST_LOCATION = pd.read_csv(
-    './external_datasets/artist_location.txt', 
-    sep='<SEP>', 
-    header=None, 
-    names=['MSD_Artists_ID', 'lat', 'lng', 'name', 'place'],
-    engine='python'
-)
-for index, row in MSD_ARTIST_LOCATION.iterrows():
-    MSD_ARTIST_LOCATION.loc[index] = [row['MSD_Artists_ID'], row['lat'], row['lng'], row['name'].lower(), str(row['place']).lower()]
-
-WORLD_CITIES = pd.read_csv(
-    './external_datasets/worldcities.csv'
-)
-int_lat, int_lng, mesh = [], [], []
-for index, row in WORLD_CITIES.iterrows():
-    int_lat.append(int(row['lat']))
-    int_lng.append(int(row['lng']))
-    mesh.append((str(row['city']) + str(row['admin_name']) + str(row['country'])).replace(' ', ''))
-    
-WORLD_CITIES['int_lat'] = int_lat
-WORLD_CITIES['int_lng'] = int_lng
-WORLD_CITIES['mesh'] = mesh
+with open('./external_datasets/external_data.pickle', 'rb') as f:
+    save = pickle.load(f)
+    LYRICS = save['LYRICS']
+    WORLD_CITIES = save['WORLD_CITIES']
+    MSD_ARTIST_LOCATION = save['MSD_ARTIST_LOCATION']
+    del save
 
 parser = argparse.ArgumentParser(description="scrapes various apis for music content")
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
@@ -814,9 +798,9 @@ def get_artist_location(artist_name):
     printlog('Try Wikipedia...')
     try:
         mb_wid, origin, born = get_metadata_wiki(artist_name)
-        if origin is not None:
+        if origin is not None and origin != '':
             location, country = check_world_city_data(origin=origin)
-        elif born is not None:
+        elif born is not None and born != '':
             location, country = check_world_city_data(born=born)
                  
         if location is None or country is None:
@@ -827,9 +811,9 @@ def get_artist_location(artist_name):
         printlog('Try Wikipedia again but add (Band)...')
         try:
             mb_wid, origin, born = get_metadata_wiki(artist_name + ' (Band)')
-            if origin is not None:
+            if origin is not None and origin != '':
                 location, country = check_world_city_data(origin=origin)
-            elif born is not None:
+            elif born is not None and born != '':
                 location, country = check_world_city_data(born=born)
                  
             if location is None or country is None:
