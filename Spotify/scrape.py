@@ -250,6 +250,24 @@ def fr_get_artist_metadata(res):
     return artist
 
 ####### Lyrics #######
+def clean_lyrics(lyrics):
+    lyrics = re.sub(re.compile(r'\[Produced by.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Interlude.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Chorus.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Verse.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Chorus.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Pre-Chorus.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Bridge.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Outro.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Pre.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Hook.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Sample.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Refrain.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Intro.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Part.*\]', re.IGNORECASE), '', lyrics)
+    lyrics = re.sub(re.compile(r'\[Breakdown.*\]', re.IGNORECASE), '', lyrics)
+    return re.sub(re.compile(r'^(\n)*|(\n)*$'), '', lyrics)
+
 def get_lyrics_genius(song_title, artist_name):
     base_url = 'https://api.genius.com'
     headers = {'Authorization': 'Bearer ' + GENIUS_CLIENT_ACCESS_TOKEN}
@@ -271,24 +289,8 @@ def get_lyrics_genius(song_title, artist_name):
         page = requests.get(song_url)
         html = BeautifulSoup(page.text, 'html.parser')
         lyrics = html.find('div', class_='lyrics').get_text()
-        lyrics = re.sub(re.compile(r'\[Produced by.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Interlude.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Chorus.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Verse.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Chorus.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Pre-Chorus.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Bridge.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Outro.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Pre.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Hook.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Sample.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Refrain.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Intro.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Part.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'\[Breakdown.*\]', re.IGNORECASE), '', lyrics)
-        lyrics = re.sub(re.compile(r'^(\n)*|(\n)*$'), '', lyrics)
-        return lyrics
-
+        return clean_lyrics(lyrics)
+    
 def get_lyrics_wikia(song_title, artist_name):
     url = 'http://lyric-api.herokuapp.com/api/find/' + artist_name.replace(' ', '%20') + '/' + song_title.replace(' ', '%20')
     return json.load(urllib2.urlopen(url))['lyric']
@@ -331,16 +333,18 @@ def get_lyrics_mm(song_title, artist_name):
     return data['lyrics']['lyrics_body'][:-70]
    
 def get_track_lyrics(song_title, artist_name):
-    printlog(f'Try getting lyrics for {song_title} by {artist_name}')
+    printlog(f'get_track_lyrics({song_title}, {artist_name})')
     printlog('Try Genius...')
     try:
         lyrics = get_lyrics_genius(song_title, artist_name)
         if len(lyrics) == 0:
             raise Exception('Lyrics empty')
     except Exception:
-        printlog('Genius lyrics not found, try AZ...', e=True)
+        printlog('Genius lyrics not found, try LYRICS data...', e=True)
         try:
-            lyrics = get_lyrics_az(song_title, artist_name)
+            lyrics = LYRICS.loc[LYRICS.artist == artist_name.lower()].\
+                            loc[LYRICS.song == song_title.lower()].lyrics.values[0]
+            lyrics = clean_lyrics(lyrics)
             if len(lyrics) == 0:
                 raise Exception('Lyrics empty')
         except Exception:
@@ -350,20 +354,25 @@ def get_track_lyrics(song_title, artist_name):
                 if len(lyrics) == 0:
                     raise Exception('Lyrics empty')
             except Exception:
-                printlog('wikia lyrics not found, try mm...', e=True)
+                printlog('wikia lyrics not found, try AZ...', e=True)
                 try:
-                    lyrics = get_lyrics_mm(song_title, artist_name)
+                    lyrics = get_lyrics_az(song_title, artist_name)
                     if len(lyrics) == 0:
                         raise Exception('Lyrics empty')
-                    lyrics = lyrics + '\n\n' + LYRICS_FOUND_BY_MM
                 except Exception:
-                    printlog('No lyrics found, exit', e=True)
-                    return None
-
+                    printlog('AZ lyrics not found, try mm...', e=True)
+                    try:
+                        lyrics = get_lyrics_mm(song_title, artist_name)
+                        if len(lyrics) == 0:
+                            raise Exception('Lyrics empty')
+                        lyrics = lyrics + '\n\n' + LYRICS_FOUND_BY_MM
+                    except Exception:
+                        printlog('No lyrics found, exit', e=True)
+                        return None
     return lyrics
 
 ####### Track #######
-def fr_get_top_tracks_albums(country, artist_name, artist_id):  
+def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_id):  
     # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
     col =  ['artist_id', 'name', 'release_date', 'release_date_precision']
     albums = pd.DataFrame(columns=col)
@@ -380,8 +389,14 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
         res_home = SPOTIFY.artist_top_tracks(seed_artist_id, country=country)
         for track in res_home['tracks']:
             if track['preview_url'] is None:
-                break
-
+                continue
+            
+            if track['id'] in df_tracks.index:
+                continue
+                
+            if track['name'] in df_tracks.loc[df_tracks.artist_id == artist_id].name.values:
+                continue
+            
             try:
                 lyrics = get_track_lyrics(track['name'], artist_name)
             except Exception:
@@ -393,8 +408,8 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
                     ' : ' + str(track['name'])
                 )
                 tracks.loc[track['id']] = [artist_id, track['album']['id'], track['name']]
-
-                if track['album']['id'] not in albums.index:
+                
+                if track['album']['id'] not in albums.index and track['album']['id'] not in df_albums.index:
                     printlog(
                         str(track['album']['id']) +
                         ' : ' + str(track['album']['name']) +
@@ -410,22 +425,32 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
 
                 lyrics_list[track['id']] = lyrics
                 previews[track['id']] = track['preview_url']
-                if track['album']['id'] not in album_covers:
-                    try:
-                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                    except:
-                        album_covers[track['album']['id']] = None
-                elif album_covers[track['album']['id']] is None:
-                    try:
-                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                    except:
-                        album_covers[track['album']['id']] = None
+                if track['album']['id'] not in df_albums.index:
+                    if track['album']['id'] not in album_covers:
+                        try:
+                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                        except:
+                            album_covers[track['album']['id']] = None
+                    elif album_covers[track['album']['id']] is None:
+                        try:
+                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                        except:
+                            album_covers[track['album']['id']] = None
                 
     res_US = SPOTIFY.artist_top_tracks(seed_artist_id, country='US')
     for track in res_US['tracks']:
         if track['preview_url'] is None:
-            break
+            continue
                 
+        if track['id'] in df_tracks.index:
+            continue        
+        
+        if track['name'] in df_tracks.loc[df_tracks.artist_id == artist_id].name.values:
+            continue
+            
+        if track['name'] in tracks.name.values:
+            continue
+        
         if track['id'] in previews:
             if previews[track['id']] is None:
                 try:
@@ -439,8 +464,8 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
                         ' : ' + str(track['name'])
                     )
                     tracks.loc[track['id']] = [artist_id, track['album']['id'], track['name']]
-
-                    if track['album']['id'] not in albums.index:
+                    
+                    if track['album']['id'] not in albums.index and track['album']['id'] not in df_albums.index:
                         printlog(
                             str(track['album']['id']) +
                             ' : ' + str(track['album']['name']) +
@@ -456,16 +481,17 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
 
                     lyrics_list[track['id']] = lyrics
                     previews[track['id']] = track['preview_url']
-                    if track['album']['id'] not in album_covers:
-                        try:
-                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                        except:
-                            album_covers[track['album']['id']] = None
-                    elif album_covers[track['album']['id']] is None:
-                        try:
-                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                        except:
-                            album_covers[track['album']['id']] = None
+                    if track['album']['id'] not in df_albums.index:
+                        if track['album']['id'] not in album_covers:
+                            try:
+                                album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                            except:
+                                album_covers[track['album']['id']] = None
+                        elif album_covers[track['album']['id']] is None:
+                            try:
+                                album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                            except:
+                                album_covers[track['album']['id']] = None
         else:
             try:
                 lyrics = get_track_lyrics(track['name'], artist_name)
@@ -479,7 +505,7 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
                 )
                 tracks.loc[track['id']] = [artist_id, track['album']['id'], track['name']]
 
-                if track['album']['id'] not in albums.index:
+                if track['album']['id'] not in albums.index and track['album']['id'] not in df_albums.index:
                     printlog(
                         str(track['album']['id']) +
                         ' : ' + str(track['album']['name']) +
@@ -495,16 +521,17 @@ def fr_get_top_tracks_albums(country, artist_name, artist_id):
 
                 lyrics_list[track['id']] = lyrics
                 previews[track['id']] = track['preview_url']
-                if track['album']['id'] not in album_covers:
-                    try:
-                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                    except:
-                        album_covers[track['album']['id']] = None
-                elif album_covers[track['album']['id']] is None:
-                    try:
-                        album_covers[track['album']['id']] = track['album']['images'][0]['url']
-                    except:
-                        album_covers[track['album']['id']] = None
+                if track['album']['id'] not in df_albums.index:
+                    if track['album']['id'] not in album_covers:
+                        try:
+                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                        except:
+                            album_covers[track['album']['id']] = None
+                    elif album_covers[track['album']['id']] is None:
+                        try:
+                            album_covers[track['album']['id']] = track['album']['images'][0]['url']
+                        except:
+                            album_covers[track['album']['id']] = None
 
     return tracks, albums, lyrics_list, previews, album_covers
 
@@ -626,6 +653,37 @@ def fr_get_all_tracks(country, artist_name, artist_id):
         return tracks, albums, lyrics_list, previews, album_covers 
 
 ####### Location #######
+def get_location_from_coord(lat, lng):
+    printlog(f'Getting location from coordinates: {lat}, {lng}', e=True)
+
+    close_cities = WORLD_CITIES.loc[WORLD_CITIES.int_lat == int(lat)].loc[WORLD_CITIES.int_lng == int(lng)]
+
+    if len(close_cities) == 0:
+        city = None
+        for tol in [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]:
+            for _, row in WORLD_CITIES.iterrows():
+                if (abs(row['lat'] - lat) <= tol) and (abs(row['lng'] - lng) <= tol):
+                    city = row
+                    break
+        if city is not None:
+            country = city.iso2
+    
+    elif len(close_cities) == 1:
+        country = close_cities.iso2.values[0]
+                 
+    else:
+        city = None
+        for tol in [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]:
+            for _, row in close_cities.iterrows():
+                if (abs(row['lat'] - lat) <= tol) and (abs(row['lng'] - lng) <= tol):
+                    city = row
+                    break
+        if city is not None:
+            country = city.iso2
+
+    printlog(f'Country is: {country}')
+    return {'lat': lat, 'lng': lng}, country
+
 def check_world_city_data(born=None, origin=None, area1=None, area2=None):
     printlog(f'born:{born}, origin:{origin}, area1:{area1}, area2:{area2}')
     if origin is not None:
@@ -865,31 +923,7 @@ def get_artist_location(artist_name):
                         try:
                             printlog('Failed to get the location from google, try MSD', e=True)
                             data = MSD_ARTIST_LOCATION.loc[MSD_ARTIST_LOCATION.name == artist_name.lower()].values[0]
-                            location = {'lat': data[1], 'lng': data[2]}
-
-                            close_cities = WORLD_CITIES.loc[WORLD_CITIES.int_lat == int(location['lat'])].loc[WORLD_CITIES.int_lng == int(location['lng'])]
-
-                            if len(close_cities) == 0:
-                                try:
-                                    country = pycountry.countries.lookup(data[4]).name
-                                except Exception: 
-                                    try:
-                                        _, country = get_metadata_mm(artist_name)
-                                    except Exception:
-                                        pass
-                            elif len(close_cities) == 1:
-                                country = close_cities.iso2.values[0]
-                            else:
-                                city = None
-                                for tol in [0.0001, 0.001, 0.01, 0.1, 1]:
-                                    for index, row in close_cities.iterrows():
-                                        if (abs(row['lat'] - location['lat']) <= tol) and (abs(row['lng'] - location['lng']) <= tol):
-                                            city = row
-
-                                if city is not None:
-                                    country = city.iso2
-
-                            return location, country
+                            return get_location_from_coord(data[1], data[2])
                         except Exception:
                             printlog('Last resort, try Musixmatch...', e=True)
                             try:
@@ -1026,21 +1060,21 @@ if __name__=='__main__':
             # id: '', name: '', genres: [], lat: ?, lng: ?
             printlog(f'Getting metadata for seed artist with ID: {seed_artist_id}...') 
 
-            printlog(f'Check if its been loaded into future artists before...') 
+            if seed_artist_id in ARTISTS.index:
+                printlog(f'Getting metadata from artists...') 
+                artist_metadata = ARTISTS.loc[[seed_artist_id]]
+                printlog(f'Success getting metadata from artists!') 
 
-            if seed_artist_id in FUTURE_ARTISTS.index:
+            elif seed_artist_id in FUTURE_ARTISTS.index:
                 printlog(f'Getting metadata from future artists...') 
                 artist_metadata = FUTURE_ARTISTS.loc[[seed_artist_id]]
-
-            elif seed_artist_id in ARTISTS.index:
-                raise Exception("Seed artist already saved as an artist. This should not happen!")
+                printlog(f'Success getting metadata from future artists!') 
 
             else:
-                printlog(f'Not found in future artists, get from spotify...') 
+                printlog(f'Not found in artists or future artists, get from spotify...') 
                 artist_metadata = fr_get_artist_metadata(res=SPOTIFY.artist(seed_artist_id))
-
-            printlog(f'Success getting metadata!') 
-
+                printlog(f'Success getting metadata from spotify!') 
+            printlog(f'{artist_metadata.loc[seed_artist_id]["name"]}')
         except Exception:
             printlog('Exception occured getting metadata!', e=True)
             backup_dataframes()
@@ -1048,20 +1082,25 @@ if __name__=='__main__':
 
         ################## Get location #################################################
         try:
-            # {lat: 0.0, lng: 0.0}
-            printlog(f'Getting location of artist...')
+            printlog(f'Check if location needs to be determined...') 
+            if artist_metadata.lat[0] is None or artist_metadata.lng[0] is None:
+                # {lat: 0.0, lng: 0.0}
+                printlog(f'Getting location of artist...')
 
-            location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
+                location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
 
-            if location is None:
-                printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
-                num_seed_artists -= 1
-                continue
+                if location is None:
+                    printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
+                    num_seed_artists -= 1
+                    continue
 
-            artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
-            artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
+                artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
+                artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
 
-            printlog(f'Success getting location.')
+                printlog(f'Success getting location.')
+
+            else:
+                location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
 
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
@@ -1080,6 +1119,8 @@ if __name__=='__main__':
             printlog(f'Getting top tracks for seed artist...')
 
             tracks, albums, lyrics, previews, album_covers = fr_get_top_tracks_albums(
+                df_tracks=TRACKS,
+                df_albums=ALBUMS,
                 country=country, 
                 artist_name=artist_metadata.loc[seed_artist_id]['name'], 
                 artist_id=seed_artist_id
@@ -1109,14 +1150,13 @@ if __name__=='__main__':
         ################## Download track audio clip ####################################
         tracks_downloaded = set()
         for i, url in previews.items():
-            if tracks.loc[i]['album_id'] in albums_downloaded:
-                try:
-                    printlog(f'Downloading track {i}...')
-                    urllib.request.urlretrieve(url, './audio/temp/' + i + '.mp3') 
-                    tracks_downloaded.add(i)
-                    printlog(f'Done!')
-                except Exception:
-                    printlog(f'Error downloading track {url}', e=True)
+            try:
+                printlog(f'Downloading track {i}...')
+                urllib.request.urlretrieve(url, './audio/temp/' + i + '.mp3') 
+                tracks_downloaded.add(i)
+                printlog(f'Done!')
+            except Exception:
+                printlog(f'Error downloading track {url}', e=True)
 
         ################## Save lyrics to file ##########################################
         lyrics_saved = set()
@@ -1136,18 +1176,18 @@ if __name__=='__main__':
         final_albums = set()
         for i in tracks_downloaded:
             try:
+                print(i)
                 assert(i not in TRACKS.index), 'Track already in tracks'
-                assert(tracks.loc[i]['artist_id'] not in ARTISTS.index), 'Track artist already in artists'
-                assert(tracks.loc[i]['album_id'] not in ALBUMS.index), 'Track album already in albums'
                 assert(tracks.loc[i]['artist_id'] == seed_artist_id), 'Track artist does not match the seed artist'
                 assert(tracks.loc[i]['artist_id'] in artist_metadata.index), 'Track artist does not match the seed artist metadata'
-                assert(tracks.loc[i]['album_id'] in albums_downloaded), 'Track album was not downloaded'
                 assert(i in lyrics_saved), 'Track lyrics were not saved'
                 final_tracks.add(i)
-                final_albums.add(tracks.loc[i]['album_id'])
+                if tracks.loc[i]['album_id'] not in ALBUMS.index: 
+                    assert(tracks.loc[i]['album_id'] in albums_downloaded), 'Track album was not downloaded'
+                    final_albums.add(tracks.loc[i]['album_id'])
             except AssertionError:
                 printlog(f'Failed to add track {i}', e=True)
-            
+
         if len(final_tracks) > 0:
             try:
                 printlog('Saving scraped data to the dataframes...')
@@ -1224,17 +1264,17 @@ if __name__=='__main__':
         ################## Check integrity of the data ##################################
         integrityIsGood = True
         if (set([n[9:-4] for n in glob.glob("./albums/*.jpg")]) != set(ALBUMS.index.values)):
-            printlog('Album covers saved saved to file do not match albums saved to data:')
+            printlog('Album covers saved to file do not match albums saved to data:')
             printlog(set([n[9:-4] for n in glob.glob("./albums/*.jpg")]).symmetric_difference(set(ALBUMS.index.values)))
             integrityIsGood = False
             
         if (set([n[8:-4] for n in glob.glob("./audio/*.mp3")]) != set(TRACKS.index.values)):
-            printlog('Audio saved saved to file do not match tracks saved to data:')
+            printlog('Audio saved to file do not match tracks saved to data:')
             printlog(set([n[8:-4] for n in glob.glob("./audio/*.mp3")]).symmetric_difference(set(TRACKS.index.values)))
             integrityIsGood = False
             
         if (set([n[9:-4] for n in glob.glob("./lyrics/*.txt")]) != set(TRACKS.index.values)):
-            printlog('Lyrics saved saved to file do not match tracks saved to data:')
+            printlog('Lyrics saved to file do not match tracks saved to data:')
             printlog(set([n[9:-4] for n in glob.glob("./lyrics/*.txt")]).symmetric_difference(set(TRACKS.index.values)))
             integrityIsGood = False
             
