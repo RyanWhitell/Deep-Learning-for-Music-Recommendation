@@ -67,6 +67,7 @@ with open('./external_datasets/external_data.pickle', 'rb') as f:
 
 parser = argparse.ArgumentParser(description="scrapes various apis for music content")
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
+parser.add_argument('-c', '--random', default=0, help='grab random seed artists rather than from the top')
 parser.add_argument('-s', '--seeds', default=None, help='injects seed artists via comma separated list')
 parser.add_argument('-t', '--seeds-top', default=False, help='inject seeds at the top of the list')
 parser.add_argument('-r', '--seeds-reset', default=False, help='reset seed artists that failed so they can run a second time')
@@ -199,11 +200,17 @@ def inject_seed_artists(df, list_ids, top=False):
             if i not in df.index:
                 df.loc[i] = False
             
-def get_next_seed_artist(seed_artists):
-    try:
-        return seed_artists.loc[seed_artists.has_been_scraped == False].index.values[0]
-    except IndexError:
-        return -1
+def get_next_seed_artist(seed_artists, r=False):
+    if r:
+        try:
+            return random.choice(seed_artists.loc[seed_artists.has_been_scraped == False].index.values)
+        except IndexError:
+            return -1
+    else:
+        try:
+            return seed_artists.loc[seed_artists.has_been_scraped == False].index.values[0]
+        except IndexError:
+            return -1
 
 def mark_seed_as_scraped(df, seed_artist_id):
     df.loc[seed_artist_id] = True
