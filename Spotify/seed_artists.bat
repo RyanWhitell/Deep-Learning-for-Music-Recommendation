@@ -1,17 +1,3 @@
-:: Techno
-:: Alan Fitzpatrick 'house', 'minimal techno', 'tech house', 'techno'
-python scrape.py -s=40JyDxGqtYSowWYT2jaive
-
-:: Techno
-:: Alan Fitzpatrick 'christmas', 'classic rock', 'folk rock', 'rock', 'rock-and-roll', 'rockabilly', 'soul'
-python scrape.py -s=40JyDxGqtYSowWYT2jaive
-
-
-
-
-
-
-
 :: Rock
 :: Queen 'glam rock', 'rock'
 python scrape.py -s=1dfeR4HaWDbWqFHLkxsg1d

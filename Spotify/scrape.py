@@ -355,7 +355,7 @@ def get_track_lyrics(song_title, artist_name):
             if len(lyrics) == 0:
                 raise Exception('Lyrics empty')
         except Exception:
-            printlog('AZ lyrics not found, try wikia...', e=True)
+            printlog('LYRICS lyrics not found, try wikia...', e=True)
             try:
                 lyrics = get_lyrics_wikia(song_title, artist_name)
                 if len(lyrics) == 0:
@@ -665,9 +665,11 @@ def get_location_from_coord(lat, lng):
 
     close_cities = WORLD_CITIES.loc[WORLD_CITIES.int_lat == int(lat)].loc[WORLD_CITIES.int_lng == int(lng)]
 
+    country = None
+
     if len(close_cities) == 0:
         city = None
-        for tol in [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]:
+        for tol in [0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10]:
             for _, row in WORLD_CITIES.iterrows():
                 if (abs(row['lat'] - lat) <= tol) and (abs(row['lng'] - lng) <= tol):
                     city = row
@@ -1081,7 +1083,7 @@ if __name__=='__main__':
                 printlog(f'Not found in artists or future artists, get from spotify...') 
                 artist_metadata = fr_get_artist_metadata(res=SPOTIFY.artist(seed_artist_id))
                 printlog(f'Success getting metadata from spotify!') 
-            printlog(f'{artist_metadata.loc[seed_artist_id]["name"]}')
+            printlog(f'\n*******\n{artist_metadata.loc[seed_artist_id]["name"]}\n*******\n')
         except Exception:
             printlog('Exception occured getting metadata!', e=True)
             backup_dataframes()
