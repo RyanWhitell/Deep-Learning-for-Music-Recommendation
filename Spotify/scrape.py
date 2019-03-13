@@ -355,6 +355,7 @@ def get_track_lyrics(song_title, artist_name):
             if len(lyrics) == 0:
                 raise Exception('Lyrics empty')
         except Exception:
+            """
             printlog('LYRICS lyrics not found, try wikia...', e=True)
             try:
                 lyrics = get_lyrics_wikia(song_title, artist_name)
@@ -367,15 +368,17 @@ def get_track_lyrics(song_title, artist_name):
                     if len(lyrics) == 0:
                         raise Exception('Lyrics empty')
                 except Exception:
-                    printlog('AZ lyrics not found, try mm...', e=True)
-                    try:
-                        lyrics = get_lyrics_mm(song_title, artist_name)
-                        if len(lyrics) == 0:
-                            raise Exception('Lyrics empty')
-                        lyrics = lyrics + '\n\n' + LYRICS_FOUND_BY_MM
-                    except Exception:
-                        printlog('No lyrics found, exit', e=True)
-                        return None
+                    """
+            printlog('AZ lyrics not found, try mm...', e=True)
+            try:
+                lyrics = get_lyrics_mm(song_title, artist_name)
+                if len(lyrics) == 0:
+                    raise Exception('Lyrics empty')
+                lyrics = lyrics + '\n\n' + LYRICS_FOUND_BY_MM
+            except Exception:
+                printlog('No lyrics found, exit', e=True)
+                return None
+                
     return lyrics
 
 ####### Track #######
@@ -991,7 +994,7 @@ if __name__=='__main__':
         try:
             printlog('Getting next artist from seed_artists...')
 
-            seed_artist_id = get_next_seed_artist(seed_artists=SEED_ARTISTS)
+            seed_artist_id = get_next_seed_artist(seed_artists=SEED_ARTISTS, r=args.random)
             printlog(f'{seed_artist_id} obtained as the next seed artist')
 
             if seed_artist_id == -1:
