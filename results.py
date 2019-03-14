@@ -10,6 +10,8 @@ from keras.models import load_model
 from keras import backend as K
 from keras.utils import to_categorical
 
+from keras.datasets import cifar100
+
 import h5py
 import pickle
 
@@ -21,8 +23,8 @@ warnings.filterwarnings("ignore")
 import FMA
 
 parser = argparse.ArgumentParser(description="gets testing results from a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
-parser.add_argument('-f', '--features', required=True, help='features to use: stft, stft_halved, mel_scaled_stft')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
+parser.add_argument('-f', '--features', default='', help='features to use: stft, stft_halved, mel_scaled_stft')
 args = parser.parse_args()
 
 class DataGenerator(keras.utils.Sequence):
@@ -88,33 +90,40 @@ def test_model(model_name, dim, features, dataset):
         labels = FMA.TOP_GENRES
         num_classes = FMA.NUM_CLASSES
 
-    tbs = 1
-    for i in range(1,17):
-        if len(test_list) % i == 0:
-            tbs = i
-    
-    test_generator = DataGenerator(
-        list_IDs=test_list,
-        labels=labels,
-        batch_size=tbs,
-        dim=dim,
-        n_classes=num_classes,
-        features=features,
-        dataset=dataset,
-        shuffle=False
-    )
+        tbs = 1
+        for i in range(1,17):
+            if len(test_list) % i == 0:
+                tbs = i
+        
+        test_generator = DataGenerator(
+            list_IDs=test_list,
+            labels=labels,
+            batch_size=tbs,
+            dim=dim,
+            n_classes=num_classes,
+            features=features,
+            dataset=dataset,
+            shuffle=False
+        )
 
-    softmax_out = model.predict_generator(
-        generator=test_generator,
-        verbose=1
-    )
+        softmax_out = model.predict_generator(
+            generator=test_generator,
+            verbose=1
+        )
+
+    elif dataset == 'cifar100':
+        softmax_out = model.predict(
+            x=CIFAR_X,
+            batch_size=10,
+            verbose=1
+        )
 
     predicted = []
     for pred in softmax_out:
         predicted.append(pred.argmax())
     
     predicted = np.array(predicted)
-    
+
     acc = sum(predicted == y_true) / len(predicted)
     f1_macro = metrics.f1_score(y_true, predicted, average='macro')
     f1_micro = metrics.f1_score(y_true, predicted, average='micro')
@@ -135,25 +144,39 @@ if __name__ == '__main__':
         y_true = np.array(y_true)    
         y_true_oh = keras.utils.to_categorical(y_true, num_classes=FMA.NUM_CLASSES)
 
-    if args.features == 'stft':
-        freq, time = 2049, 643  
-        dim = (freq, time)
+        if args.features == 'stft':
+            freq, time = 2049, 643  
+            dim = (freq, time)
 
-    if args.features == 'stft_halved':
-        freq, time = 2049//2, 643
-        dim = (freq, time)
+        if args.features == 'stft_halved':
+            freq, time = 2049//2, 643
+            dim = (freq, time)
 
-    if args.features == 'mel_scaled_stft':
-        freq, time = 256, 643
-        dim = (freq, time)
+        if args.features == 'mel_scaled_stft':
+            freq, time = 256, 643
+            dim = (freq, time)
 
-    if args.features == 'cqt':
-        freq, time = 168, 643
-        dim = (freq, time)
+        if args.features == 'cqt':
+            freq, time = 168, 643
+            dim = (freq, time)
 
-    if args.features == 'chroma':
-        freq, time = 12, 643
-        dim = (freq, time)
+        if args.features == 'chroma':
+            freq, time = 12, 643
+            dim = (freq, time)
+        
+    elif args.dataset == 'cifar100':
+        (_, _), (CIFAR_X, y_true) = cifar100.load_data(label_mode='fine')
+        y_true_oh =  keras.utils.to_categorical(y_true, num_classes=100)
+
+        y_true = y_true.reshape(-1)
+
+        args.features = 'cifar100'
+        num_classes = 100
+        freq, time = 32, 32
+        dim = (freq, time, 3)
+    
+    else:
+        raise Exception('Wrong dataset!')
 
     results = pd.DataFrame({
         'name':['Time','Freq','Simple','TimeFreq']
