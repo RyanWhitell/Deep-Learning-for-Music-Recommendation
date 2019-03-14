@@ -378,7 +378,7 @@ def get_track_lyrics(song_title, artist_name):
             except Exception:
                 printlog('No lyrics found, exit', e=True)
                 return None
-                
+
     return lyrics
 
 ####### Track #######
@@ -868,9 +868,9 @@ def get_artist_location(artist_name):
     printlog('Try Wikipedia...')
     try:
         mb_wid, origin, born = get_metadata_wiki(artist_name)
-        if origin is not None and origin != '':
+        if origin is not None and len(origin) >= 7:
             location, country = check_world_city_data(origin=origin)
-        elif born is not None and born != '':
+        elif born is not None and len(born) >= 5:
             location, country = check_world_city_data(born=born)
                  
         if location is None or country is None:
@@ -881,11 +881,11 @@ def get_artist_location(artist_name):
         printlog('Try Wikipedia again but add (Band)...')
         try:
             mb_wid, origin, born = get_metadata_wiki(artist_name + ' (Band)')
-            if origin is not None and origin != '':
+            if origin is not None and len(born) >= 7:
                 location, country = check_world_city_data(origin=origin)
-            elif born is not None and born != '':
+            elif born is not None and len(born) >= 5:
                 location, country = check_world_city_data(born=born)
-                 
+    
             if location is None or country is None:
                 raise Exception('Location could not be found in world city data')
             else:
@@ -1193,10 +1193,12 @@ if __name__=='__main__':
                 assert(tracks.loc[i]['artist_id'] == seed_artist_id), 'Track artist does not match the seed artist'
                 assert(tracks.loc[i]['artist_id'] in artist_metadata.index), 'Track artist does not match the seed artist metadata'
                 assert(i in lyrics_saved), 'Track lyrics were not saved'
-                final_tracks.add(i)
                 if tracks.loc[i]['album_id'] not in ALBUMS.index: 
                     assert(tracks.loc[i]['album_id'] in albums_downloaded), 'Track album was not downloaded'
                     final_albums.add(tracks.loc[i]['album_id'])
+                    final_tracks.add(i)
+                else:
+                    final_tracks.add(i)
             except AssertionError:
                 printlog(f'Failed to add track {i}', e=True)
 
