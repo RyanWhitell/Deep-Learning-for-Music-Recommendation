@@ -8,6 +8,8 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras import backend as K
 from keras.utils import to_categorical
 
+from keras.datasets import cifar100
+
 import h5py
 import pickle
 import argparse
@@ -15,11 +17,17 @@ import argparse
 import FMA
 
 parser = argparse.ArgumentParser(description="trains a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
-parser.add_argument('-t', '--test', required=True, help='test to carry out: sgc')
-parser.add_argument('-f', '--features', required=True, help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
+parser.add_argument('-t', '--test', default='', help='test to carry out: sgc')
+parser.add_argument('-f', '--features', default='', help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
+
+"""
+Valid test combinations:
+fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma
+cifar100
+"""
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
@@ -91,56 +99,86 @@ def train_model(model, model_name, dim, features, dataset, quick):
             labels = FMA.TOP_GENRES
             num_classes = FMA.NUM_CLASSES
 
-        model.compile(
-            loss=keras.losses.categorical_crossentropy,
-            optimizer=keras.optimizers.Adam(),
-            metrics=['acc']
-        )
+            model.compile(
+                loss=keras.losses.categorical_crossentropy,
+                optimizer=keras.optimizers.Adam(),
+                metrics=['acc']
+            )
 
-        checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
-        early_stop = EarlyStopping(monitor='val_acc', patience=20, mode='max') 
-        callbacks_list = [checkpoint, early_stop]
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+            early_stop = EarlyStopping(monitor='val_acc', patience=20, mode='max') 
+            callbacks_list = [checkpoint, early_stop]
 
-        if quick:
-            epochs = 1
-            train_list = train_list[:64]
-            val_list = train_list[:64]
-        else:
-            epochs = 100
+            if quick:
+                epochs = 1
+                train_list = train_list[:64]
+                val_list = train_list[:64]
+            else:
+                epochs = 500
 
-        training_generator = DataGenerator(
-            list_IDs=train_list,
-            labels=labels,
-            batch_size=8,
-            dim=dim,
-            n_classes=num_classes,
-            features=features,
-            dataset=dataset
-        )
+            training_generator = DataGenerator(
+                list_IDs=train_list,
+                labels=labels,
+                batch_size=8,
+                dim=dim,
+                n_classes=num_classes,
+                features=features,
+                dataset=dataset
+            )
 
-        vbs = 1
-        for i in range(1,17):
-            if len(val_list) % i == 0:
-                vbs = i
+            vbs = 1
+            for i in range(1,17):
+                if len(val_list) % i == 0:
+                    vbs = i
 
-        val_generator = DataGenerator(
-            list_IDs=val_list,
-            labels=labels,
-            batch_size=vbs,
-            dim=dim,
-            n_classes=num_classes,
-            features=features,
-            dataset=dataset,
-            shuffle=False
-        )
+            val_generator = DataGenerator(
+                list_IDs=val_list,
+                labels=labels,
+                batch_size=vbs,
+                dim=dim,
+                n_classes=num_classes,
+                features=features,
+                dataset=dataset,
+                shuffle=False
+            )
 
-        history = model.fit_generator(
-            generator=training_generator,
-            validation_data=val_generator,
-            epochs=epochs,
-            verbose=1,
-            callbacks=callbacks_list
-        )
+            history = model.fit_generator(
+                generator=training_generator,
+                validation_data=val_generator,
+                epochs=epochs,
+                verbose=1,
+                callbacks=callbacks_list
+            )
+
+        elif dataset == 'cifar100':
+            (CIFAR_X, CIFAR_Y), (_, _) = cifar100.load_data(label_mode='fine')
+
+            model.compile(
+                loss=keras.losses.categorical_crossentropy,
+                optimizer=keras.optimizers.Adam(),
+                metrics=['acc']
+            )
+
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+            early_stop = EarlyStopping(monitor='val_acc', patience=20, mode='max') 
+            callbacks_list = [checkpoint, early_stop]
+
+            if quick:
+                epochs = 1
+                CIFAR_X = CIFAR_X[:1000,:,:,:]
+                CIFAR_Y = CIFAR_Y[:1000]
+            else:
+                epochs = 500
+
+            history = model.fit(
+                x=CIFAR_X, 
+                y= keras.utils.to_categorical(CIFAR_Y, num_classes=100), 
+                batch_size=8, 
+                epochs=epochs, 
+                verbose=1, 
+                callbacks=callbacks_list, 
+                validation_split=0.2
+            )
 
         with open(model_name + '.history.pkl', 'wb') as file_pi:
             pickle.dump(history.history, file_pi)
@@ -158,13 +196,13 @@ def train_model(model, model_name, dim, features, dataset, quick):
 def Simple(features, input_shape, num_classes):
     inputs = layers.Input(shape=input_shape)
 
-    if features in ['chroma']:
-        pad = 'same'
+    if features in ['chroma', 'cifar100']:
+        s, pad = 1, 'same'
     else:
-        pad = 'valid'
+        s, pad = 2, 'valid'
 
     ############## INPUT LAYER ##############
-    x = layers.Conv2D(8, (3, 3), strides=(2, 2), use_bias=False, padding='same', name='input1_1')(inputs)
+    x = layers.Conv2D(8, (3, 3), strides=(s, s), use_bias=False, padding='same', name='input1_1')(inputs)
     x = layers.BatchNormalization(name='input1_1_bn')(x)
     x = layers.Activation('relu', name='input1_1_relu')(x)
 
@@ -173,7 +211,7 @@ def Simple(features, input_shape, num_classes):
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
     
-    if features in ['mel_scaled_stft', 'cqt', 'chroma']:
+    if features in ['mel_scaled_stft', 'cqt', 'chroma', 'cifar100']:
         x = layers.Conv2D(16, (3, 3), strides=(1, 1), use_bias=False, name='input1_2')(x)
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
@@ -186,7 +224,8 @@ def Simple(features, input_shape, num_classes):
     x = layers.SeparableConv2D(64, (3, 3), use_bias=False, padding=pad, name='block1_2')(x)
     x = layers.BatchNormalization(name='block1_2_bn')(x)
  
-    x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block1_mp')(x)
+    if features not in ['cifar100']:
+        x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block1_mp')(x)
  
     x = layers.Activation('relu', name='block1_2_relu')(x)
     
@@ -202,7 +241,8 @@ def Simple(features, input_shape, num_classes):
     x = layers.SeparableConv2D(256, (3, 3), use_bias=False, padding=pad, name='block3')(x)
     x = layers.BatchNormalization(name='block3_bn')(x)
 
-    x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block3_mp')(x)
+    if features not in ['cifar100']:
+        x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block3_mp')(x)
 
     x = layers.Activation('relu', name='block3_relu')(x)
     
@@ -232,35 +272,40 @@ def Time(features, iks, input_shape, num_classes):
 
     inputs = layers.Input(shape=input_shape)
 
+    if features in ['cifar100']:
+        s, t, pad = 1, 9, 'same'
+    else:
+        s, t, pad = 2, 9, 'valid'
+
     ############## INPUT LAYER ##############
-    w1 = layers.Conv2D(2, (1, time//iks[0]), strides=(1, 2), use_bias=False, padding='same', name='input_over_' + str(iks[0]))(inputs)
+    w1 = layers.Conv2D(2, (1, time//iks[0]), strides=(1, s), use_bias=False, padding='same', name='input_over_' + str(iks[0]))(inputs)
     w1 = layers.BatchNormalization(name='input_over_' + str(iks[0]) + '_bn')(w1)
     w1 = layers.Activation('relu', name='input_over_' + str(iks[0]) + '_relu')(w1)
 
-    w2 = layers.Conv2D(2, (1, time//iks[1]), strides=(1, 2), use_bias=False, padding='same', name='input_over_' + str(iks[1]))(inputs)
+    w2 = layers.Conv2D(2, (1, time//iks[1]), strides=(1, s), use_bias=False, padding='same', name='input_over_' + str(iks[1]))(inputs)
     w2 = layers.BatchNormalization(name='input_over_' + str(iks[1]) + '_bn')(w2)
     w2 = layers.Activation('relu', name='input_over_' + str(iks[1]) + '_relu')(w2)
     
-    w3 = layers.Conv2D(2, (1, time//iks[2]), strides=(1, 2), use_bias=False, padding='same', name='input_over_' + str(iks[2]))(inputs)
+    w3 = layers.Conv2D(2, (1, time//iks[2]), strides=(1, s), use_bias=False, padding='same', name='input_over_' + str(iks[2]))(inputs)
     w3 = layers.BatchNormalization(name='input_over_' + str(iks[2]) + '_bn')(w3)
     w3 = layers.Activation('relu', name='input_over_' + str(iks[2]) + '_relu')(w3)
     
-    w4 = layers.Conv2D(2, (1, time//iks[3]), strides=(1, 2), use_bias=False, padding='same', name='input_over_' + str(iks[3]))(inputs)
+    w4 = layers.Conv2D(2, (1, time//iks[3]), strides=(1, s), use_bias=False, padding='same', name='input_over_' + str(iks[3]))(inputs)
     w4 = layers.BatchNormalization(name='input_over_' + str(iks[3]) + '_bn')(w4)
     w4 = layers.Activation('relu', name='input_over_' + str(iks[3]) + '_relu')(w4)
 
-    w5 = layers.Conv2D(2, (1, time//iks[4]), strides=(1, 2), use_bias=False, padding='same', name='input_over_' + str(iks[4]))(inputs)
+    w5 = layers.Conv2D(2, (1, time//iks[4]), strides=(1, s), use_bias=False, padding='same', name='input_over_' + str(iks[4]))(inputs)
     w5 = layers.BatchNormalization(name='input_over_' + str(iks[4]) + '_bn')(w5)
     w5 = layers.Activation('relu', name='input_over_' + str(iks[4]) + '_relu')(w5)
 
-    w6 = layers.Conv2D(2, (1, time//iks[5]), strides=(1, 2), use_bias=False, padding='same', name='input_over_' + str(iks[5]))(inputs)
+    w6 = layers.Conv2D(2, (1, time//iks[5]), strides=(1, s), use_bias=False, padding='same', name='input_over_' + str(iks[5]))(inputs)
     w6 = layers.BatchNormalization(name='input_over_' + str(iks[5]) + '_bn')(w6)
     w6 = layers.Activation('relu', name='input_over_' + str(iks[5]) + '_relu')(w6)
     
     x = layers.concatenate([w1, w2, w3, w4, w5, w6], axis=3, name='inputs')
 
     ############## HIDDEN LAYER 1  ##############
-    x = layers.SeparableConv2D(16, (1, 9), use_bias=False, name='block1')(x)
+    x = layers.SeparableConv2D(16, (1, t), use_bias=False, padding=pad, name='block1')(x)
     x = layers.BatchNormalization(name='block1_bn')(x)
 
     if features in ['chroma']:
@@ -271,7 +316,7 @@ def Time(features, iks, input_shape, num_classes):
     x = layers.Activation('relu', name='block1_relu')(x)
 
     ############## HIDDEN LAYER 2  ##############
-    x = layers.SeparableConv2D(32, (1, 9), use_bias=False, name='block2')(x)
+    x = layers.SeparableConv2D(32, (1, t), use_bias=False, padding=pad, name='block2')(x)
     x = layers.BatchNormalization(name='block2_bn')(x)
 
     if features in ['chroma']:
@@ -282,7 +327,7 @@ def Time(features, iks, input_shape, num_classes):
     x = layers.Activation('relu', name='block2_relu')(x)
 
     ############## HIDDEN LAYER 3  ##############
-    x = layers.SeparableConv2D(64, (1, 9), use_bias=False, name='block3')(x)
+    x = layers.SeparableConv2D(64, (1, t), use_bias=False, padding=pad, name='block3')(x)
     x = layers.BatchNormalization(name='block3_bn')(x)
 
     if features in ['chroma']:
@@ -293,7 +338,7 @@ def Time(features, iks, input_shape, num_classes):
     x = layers.Activation('relu', name='block3_relu')(x)
     
     ############## OUTPUT LAYER ##############
-    x = layers.SeparableConv2D(128, (1, 9), use_bias=False, name='preflat')(x)
+    x = layers.SeparableConv2D(128, (1, t), use_bias=False, padding=pad, name='preflat')(x)
     x = layers.BatchNormalization(name='preflat_bn')(x)
     x = layers.Activation('relu', name='preflat_relu')(x)
 
@@ -316,6 +361,8 @@ def Freq(features, iks, input_shape, num_classes):
 
     if features in ['chroma']:
         s, f, pad = 1, 3, 'same'
+    elif features in ['cifar100']:
+        s, f, pad = 1, 9, 'same'
     else:
         s, f, pad = 2, 9, 'valid'
 
@@ -432,57 +479,70 @@ if __name__ == '__main__':
     if args.dataset == 'fma_med':
         FMA = FMA.FreeMusicArchive('medium', 22050)
         num_classes = FMA.NUM_CLASSES
+        if args.features == 'stft':
+            freq, time = 2049, 643  
+            dim = (freq, time, 1)
+            fiks = [6, 12, 32, 64, 128, 256] # 341, 170, 64, 32, 16, 8
+            tiks = [4, 8, 16, 32, 64, 96]    # 160, 80, 40, 20, 10, 6
 
-    if args.features == 'stft':
-        freq, time = 2049, 643  
-        dim = (freq, time)
-        fiks = [6, 12, 32, 64, 128, 256] # 341, 170, 64, 32, 16, 8
-        tiks = [4, 8, 16, 32, 64, 96]    # 160, 80, 40, 20, 10, 6
+        elif args.features == 'stft_halved':
+            freq, time = 2049//2, 643
+            dim = (freq, time, 1)
+            fiks = [6, 12, 32, 64, 128, 256] # 170, 85, 32, 16, 8, 4
+            tiks = [4, 8, 16, 32, 64, 96]    # 160, 80, 40, 20, 10, 6
 
-    if args.features == 'stft_halved':
-        freq, time = 2049//2, 643
-        dim = (freq, time)
-        fiks = [6, 12, 32, 64, 128, 256] # 170, 85, 32, 16, 8, 4
-        tiks = [4, 8, 16, 32, 64, 96]    # 160, 80, 40, 20, 10, 6
+        elif args.features == 'mel_scaled_stft':
+            freq, time = 256, 643
+            dim = (freq, time, 1)
+            fiks = [6, 8, 12, 24, 32, 64] # 42, 32, 21, 10, 8, 4
+            tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
 
-    if args.features == 'mel_scaled_stft':
-        freq, time = 256, 643
-        dim = (freq, time)
-        fiks = [6, 8, 12, 24, 32, 64] # 42, 32, 21, 10, 8, 4
-        tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
+        elif args.features == 'cqt':
+            freq, time = 168, 643
+            dim = (freq, time, 1)
+            fiks = [4, 5, 6, 12, 24, 48]  # 42, 33, 28, 14, 7, 3
+            tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
 
-    if args.features == 'cqt':
-        freq, time = 168, 643
-        dim = (freq, time)
-        fiks = [4, 5, 6, 12, 24, 48]  # 42, 33, 28, 14, 7, 3
-        tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
+        elif args.features == 'chroma':
+            freq, time = 12, 643
+            dim = (freq, time, 1)
+            fiks = [1, 2, 3, 4, 6, 12]  # 12, 6, 4, 3, 2, 1
+            tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
 
-    if args.features == 'chroma':
-        freq, time = 12, 643
-        dim = (freq, time)
-        fiks = [1, 2, 3, 4, 6, 12]  # 12, 6, 4, 3, 2, 1
-        tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
+        else:
+            raise Exception('Wrong dataset/feature combination!')
 
-    ################ Freq ################
+    elif args.dataset == 'cifar100':
+        args.features = 'cifar100'
+        num_classes = 100
+        freq, time = 32, 32
+        dim = (freq, time, 3)
+        fiks = [3, 4, 5, 6, 7, 10] # 10, 8, 6, 5, 4, 3
+        tiks = [3, 4, 5, 6, 7, 10] # 10, 8, 6, 5, 4, 3
+    
+    else:
+        raise Exception('Wrong dataset!')
+
+    ################# Freq ################
     K.clear_session()
-    model = Freq(features=args.features, iks=fiks, input_shape=(*dim, 1), num_classes=num_classes)
+    model = Freq(features=args.features, iks=fiks, input_shape=dim, num_classes=num_classes)
     model.summary()
     train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick) 
 
     ################ Time ################
     K.clear_session()
-    model = Time(features=args.features, iks=tiks, input_shape=(*dim, 1), num_classes=num_classes)
+    model = Time(features=args.features, iks=tiks, input_shape=dim, num_classes=num_classes)
     model.summary()
     train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)  
 
     ################ Simple ################
     K.clear_session()
-    model = Simple(features=args.features, input_shape=(*dim, 1), num_classes=num_classes)
+    model = Simple(features=args.features, input_shape=dim, num_classes=num_classes)
     model.summary()
     train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)  
 
     ################ TimeFreq ################
     K.clear_session()
-    model = TimeFreq(features=args.features, dataset=args.dataset, input_shape=(*dim, 1), num_classes=num_classes, quick=args.quick)
+    model = TimeFreq(features=args.features, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
     model.summary()
     train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)       
