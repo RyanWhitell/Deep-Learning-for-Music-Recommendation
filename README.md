@@ -1,4 +1,2 @@
-# Thesis
-Deep learning for music recommendation 
-
-This is currently in progress...
+# Deep Learning for Music Recommendation 
+Thesis currently in progress...
