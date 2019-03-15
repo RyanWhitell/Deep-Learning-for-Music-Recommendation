@@ -187,8 +187,14 @@ def print_top_genres(df, top_genres):
 def reset_failed_seed_artists(seed, artists):
     seed.loc[set(seed.loc[seed.has_been_scraped == True].index) - set(artists.index)] = False
    
-
 ####### Data #######
+def get_new_random_artist_from_lyrics(df_artists):
+    new_artist = random.choice(list(set(LYRICS.artist.values)))
+    if new_artist not in [name.lower() for name in df_artists.name.values]:
+        return LYRICS.loc[LYRICS.artist == new_artist]
+    else:
+        return get_new_random_artist_from_lyrics(df_artists=df_artists)
+
 def inject_seed_artists(df, list_ids, top=False):
     if top:
         df_top = pd.DataFrame(columns=['has_been_scraped'])
@@ -662,6 +668,93 @@ def fr_get_all_tracks(country, artist_name, artist_id):
     else:
         return tracks, albums, lyrics_list, previews, album_covers 
 
+def fl_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_id, artist_lyrics):
+    # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
+    col =  ['artist_id', 'name', 'release_date', 'release_date_precision']
+    albums = pd.DataFrame(columns=col)
+
+    # id: {artist_id: '', album_id: '', name: ''}
+    col =  ['artist_id', 'album_id', 'name']
+    tracks = pd.DataFrame(columns=col)
+
+    lyrics_list = {}
+    previews = {}
+    album_covers = {}
+    
+    for _, row in artist_lyrics.iterrows():
+        try:
+            q = str(artist_name) + ' ' + str(row['song'])
+            res = SPOTIFY.search(q=q, limit=1, offset=0, type='track', market='US')
+
+            if len(res['tracks']['items']) > 1:
+                if res['tracks']['items'][0]['preview_url'] is None:
+                    res = SPOTIFY.search(q=q, limit=1, offset=0, type='track', market=country)
+            else:
+                res = SPOTIFY.search(q=q, limit=1, offset=0, type='track', market=country)
+        except:
+            continue
+        
+        try:
+            if res['tracks']['items'][0]['artists'][0]['id'] != artist_id:
+                continue
+
+            if res['tracks']['items'][0]['preview_url'] is None:
+                continue
+
+            if res['tracks']['items'][0]['name'].lower() != row['song']:
+                continue
+                
+            if res['tracks']['items'][0]['id'] in df_tracks.index:
+                continue        
+        
+            if res['tracks']['items'][0]['name'] in df_tracks.loc[df_tracks.artist_id == artist_id].name.values:
+                continue
+
+            if res['tracks']['items'][0]['name'] in tracks.name.values:
+                continue
+                
+        except:
+            continue
+            
+            
+        res_track = res['tracks']['items'][0]
+        
+        printlog(
+            str(res_track['id']) +
+            ' : ' + str(res_track['name'])
+        )
+        tracks.loc[res_track['id']] = [artist_id, res_track['album']['id'], res_track['name']]
+
+        if res_track['album']['id'] not in albums.index and res_track['album']['id'] not in df_albums.index:
+            printlog(
+                str(res_track['album']['id']) +
+                ' : ' + str(res_track['album']['name']) +
+                ' : ' + str(res_track['album']['release_date']) +
+                ' : ' + str(res_track['album']['release_date_precision'])
+            )
+            albums.loc[res_track['album']['id']] = [
+                artist_id, 
+                res_track['album']['name'], 
+                res_track['album']['release_date'], 
+                res_track['album']['release_date_precision']
+            ]
+
+        lyrics_list[res_track['id']] = clean_lyrics(row['lyrics'])
+        previews[res_track['id']] = res_track['preview_url']
+        if res_track['album']['id'] not in df_albums.index:
+            if res_track['album']['id'] not in album_covers:
+                try:
+                    album_covers[res_track['album']['id']] = res_track['album']['images'][0]['url']
+                except:
+                    album_covers[res_track['album']['id']] = None
+            elif album_covers[res_track['album']['id']] is None:
+                try:
+                    album_covers[res_track['album']['id']] = res_track['album']['images'][0]['url']
+                except:
+                    album_covers[res_track['album']['id']] = None
+                    
+    return tracks, albums, lyrics_list, previews, album_covers
+
 ####### Location #######
 def get_location_from_coord(lat, lng):
     printlog(f'Getting location from coordinates: {lat}, {lng}', e=True)
@@ -980,7 +1073,6 @@ if __name__=='__main__':
         except Exception:
             printlog(f'Exception occured, could not mark seed as unscraped', e=True)
 
-
     if args.seeds is not None:
         printlog(f'Adding {args.seeds} to seed_artists list...')
         try:
@@ -1088,7 +1180,9 @@ if __name__=='__main__':
                 printlog(f'Not found in artists or future artists, get from spotify...') 
                 artist_metadata = fr_get_artist_metadata(res=SPOTIFY.artist(seed_artist_id))
                 printlog(f'Success getting metadata from spotify!') 
+
             printlog(f'\n*******\n{artist_metadata.loc[seed_artist_id]["name"]}\n*******\n')
+
         except Exception:
             printlog('Exception occured getting metadata!', e=True)
             backup_dataframes()
@@ -1143,7 +1237,323 @@ if __name__=='__main__':
             if len(tracks) == 0:
                 printlog(f'No tracks found! Bummer, cant use this artist. Try next seed artist...')
                 num_seed_artists -= 1
-                printlog('continue')
+                continue
+
+        except Exception:
+            printlog('Exception occured getting tracks and albums!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Download album art ###########################################
+        albums_downloaded = set()
+        for i, url in album_covers.items():
+            try:
+                printlog(f'Downloading album {i}...')
+                urllib.request.urlretrieve(url, './albums/temp/' + i + '.jpg') 
+                albums_downloaded.add(i)
+                printlog(f'Done!')
+            except Exception:
+                printlog(f'Error downloading album {url}', e=True)
+
+        ################## Download track audio clip ####################################
+        tracks_downloaded = set()
+        for i, url in previews.items():
+            try:
+                printlog(f'Downloading track {i}...')
+                urllib.request.urlretrieve(url, './audio/temp/' + i + '.mp3') 
+                tracks_downloaded.add(i)
+                printlog(f'Done!')
+            except Exception:
+                printlog(f'Error downloading track {url}', e=True)
+
+        ################## Save lyrics to file ##########################################
+        lyrics_saved = set()
+        for i, lyric in lyrics.items():
+            if i in tracks_downloaded:
+                try:
+                    printlog(f'Saving lyric {i}...')
+                    with open('./lyrics/temp/' + i + '.txt', 'w') as text_file:
+                        print(f"{lyric}", file=text_file)
+                    lyrics_saved.add(i)
+                    printlog(f'Done!')
+                except Exception:
+                    printlog(f'Error saving lyric {lyric}', e=True)             
+
+        ################## Save to data file ############################################
+        final_tracks = set()
+        final_albums = set()
+        for i in tracks_downloaded:
+            try:
+                print(i)
+                assert(i not in TRACKS.index), 'Track already in tracks'
+                assert(tracks.loc[i]['artist_id'] == seed_artist_id), 'Track artist does not match the seed artist'
+                assert(tracks.loc[i]['artist_id'] in artist_metadata.index), 'Track artist does not match the seed artist metadata'
+                assert(i in lyrics_saved), 'Track lyrics were not saved'
+                if tracks.loc[i]['album_id'] not in ALBUMS.index: 
+                    assert(tracks.loc[i]['album_id'] in albums_downloaded), 'Track album was not downloaded'
+                    final_albums.add(tracks.loc[i]['album_id'])
+                    final_tracks.add(i)
+                else:
+                    final_tracks.add(i)
+            except AssertionError:
+                printlog(f'Failed to add track {i}', e=True)
+
+        if len(final_tracks) > 0:
+            try:
+                printlog('Saving scraped data to the dataframes...')
+
+                for i in final_tracks:
+                    add_track(
+                        df=TRACKS, 
+                        track_id=i, 
+                        artist_id=seed_artist_id, 
+                        album_id=tracks.loc[i]['album_id'], 
+                        name=tracks.loc[i]['name'], 
+                    )
+                    
+                for i in final_albums:
+                    add_albums(
+                        df=ALBUMS, 
+                        album_id=i,
+                        artist_id=seed_artist_id, 
+                        name=albums.loc[i]['name'], 
+                        release_date=albums.loc[i]['release_date'],
+                        release_date_precision=albums.loc[i]['release_date_precision']
+                    )
+
+                add_artist(
+                    df=ARTISTS, 
+                    artist_id=seed_artist_id,
+                    name=artist_metadata.loc[seed_artist_id]['name'], 
+                    genres=artist_metadata.loc[seed_artist_id]['genres'], 
+                    related=related_artists.index.values,
+                    lat=artist_metadata.loc[seed_artist_id]['lat'], 
+                    lng=artist_metadata.loc[seed_artist_id]['lng']
+                )
+
+                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+
+                ################## Move temp files out of temp ##################################
+                time.sleep(5)
+                try:
+                    printlog('Moving temp files into the permanent location...')
+
+                    for i in final_tracks:
+                        os.rename('./lyrics/temp/' + i + '.txt', './lyrics/' + i + '.txt')
+                        os.rename('./audio/temp/' + i + '.mp3', './audio/' + i + '.mp3')
+                    
+                    for i in final_albums:
+                        os.rename('./albums/temp/' + i + '.jpg', './albums/' + i + '.jpg')
+
+                    for i in albums_downloaded:
+                        if i not in final_albums:
+                            os.remove('./albums/temp/' + i + '.jpg')
+
+                    for i in tracks_downloaded:
+                        if i not in final_tracks:   
+                            os.remove('./lyrics/temp/' + i + '.txt')
+                            os.remove('./audio/temp/' + i + '.mp3') 
+
+
+                    printlog('*' * 117)
+                    printlog(f'Artist {seed_artist_id} added!')
+                    printlog('*' * 117)
+
+                except Exception:
+                    printlog(f'Error moving files! Please move these manually {final_tracks}, {final_albums}', e=True)
+                    break 
+
+            except Exception:
+                printlog('Error adding data to dataframes!', e=True)
+                break 
+        else:
+            printlog('Failed to add any tracks! Bummer, cant use this artist. Try next seed artist...', e=True)
+            num_seed_artists -= 1
+            continue
+
+        ################## Check integrity of the data ##################################
+        integrityIsGood = True
+        if (set([n[9:-4] for n in glob.glob("./albums/*.jpg")]) != set(ALBUMS.index.values)):
+            printlog('Album covers saved to file do not match albums saved to data:')
+            printlog(set([n[9:-4] for n in glob.glob("./albums/*.jpg")]).symmetric_difference(set(ALBUMS.index.values)))
+            integrityIsGood = False
+            
+        if (set([n[8:-4] for n in glob.glob("./audio/*.mp3")]) != set(TRACKS.index.values)):
+            printlog('Audio saved to file do not match tracks saved to data:')
+            printlog(set([n[8:-4] for n in glob.glob("./audio/*.mp3")]).symmetric_difference(set(TRACKS.index.values)))
+            integrityIsGood = False
+            
+        if (set([n[9:-4] for n in glob.glob("./lyrics/*.txt")]) != set(TRACKS.index.values)):
+            printlog('Lyrics saved to file do not match tracks saved to data:')
+            printlog(set([n[9:-4] for n in glob.glob("./lyrics/*.txt")]).symmetric_difference(set(TRACKS.index.values)))
+            integrityIsGood = False
+            
+        if (set(TRACKS.artist_id.values) != set(ARTISTS.index.values)):
+            printlog('Some tracks point to artists that dont exist:')
+            printlog(set(TRACKS.artist_id.values).symmetric_difference(set(ARTISTS.index.values)))
+            integrityIsGood = False
+
+        if (set(TRACKS.album_id.values) != set(ALBUMS.index.values)):
+            printlog('Some tracks point to albums that dont exist:')
+            printlog(set(TRACKS.album_id.values).symmetric_difference(set(ALBUMS.index.values)))
+            integrityIsGood = False
+
+        for album in [n for n in glob.glob("./albums/temp/*.jpg")]:
+            os.remove(album)
+        for audio in [n for n in glob.glob("./audio/temp/*.mp3")]:
+            os.remove(audio)
+        for lyric in [n for n in glob.glob("./lyrics/temp/*.txt")]:
+            os.remove(lyric)
+
+        if not integrityIsGood:
+            break
+
+        ################## Get data starting with LYRICS ################################
+        ################## Get next seed artist #########################################
+        try:
+            printlog('Getting next artist from LYRICS data...')
+
+            artist_lyrics = get_new_random_artist_from_lyrics(df_artists=ARTISTS)
+            artist_name = artist_lyrics.artist.values[0]
+            
+            printlog(f'{artist_name} obtained as the next seed artist')
+
+        except Exception:
+            printlog('Exception occured getting next artist!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Get location #################################################
+        try:
+            printlog(f'Getting location of artist...')
+
+            location, country = get_artist_location(artist_name=artist_name)
+
+            if location is None:
+                printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
+                continue
+
+            printlog(f'Success getting location.')
+
+        except Exception:
+            printlog(f'Exception occured getting location!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Get seed artist ID and metadata ##########################################
+        try:
+            # id: '', name: '', genres: [], lat: 0.0, lng: 0.0
+            printlog(f'Getting artist ID...')
+
+            q = 'artist:' + str(artist_name)
+            results = SPOTIFY.search(q=q, type='artist')
+            
+            if len(results['artists']['items']) > 1:
+                if results['artists']['items'][0]['name'].lower() == artist_name:
+                    seed_artist_id = results['artists']['items'][0]['id']
+                    artist_metadata = fr_get_artist_metadata(res=results['artists']['items'][0])
+                    
+                    artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
+                    artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
+                else:
+                    printlog(f'Artist not could not be found! Bummer, cant use this artist. Try next seed artist...')
+                    continue
+            else:
+                printlog(f'Artist not could not be found! Bummer, cant use this artist. Try next seed artist...')
+                continue
+                
+            printlog(f'Success getting artist ID.')
+
+        except Exception:
+            printlog('Exception occured getting artist ID!', e=True)
+            backup_dataframes()
+            break     
+
+        ################## Get related artists ##########################################
+        try:
+            # id: '', name: '', genres: [], lat: ?, lng: ?
+            printlog(f'Getting related artists...')
+
+            related_artists = fr_get_related(res=SPOTIFY.artist_related_artists(seed_artist_id))
+
+            printlog(f'Success getting related artists.')
+
+        except Exception:
+            printlog('Exception occured getting related artists!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Add related artists to seed artists ##########################
+        try:
+            printlog(f'Adding related artists to seed_artists list...')
+
+            inject_seed_artists(df=SEED_ARTISTS, list_ids=related_artists.index.values)
+
+            printlog(f'Related added to seed_artists list.')
+
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+
+        except Exception:
+            printlog(f'Exception occured adding related artists to seeds!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Mark seed artist as scraped ##################################
+        try:
+            printlog(f'Mark {seed_artist_id} as scraped...')
+
+            inject_seed_artists(df=SEED_ARTISTS, list_ids=[seed_artist_id])
+            mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id)
+
+            printlog(f'{seed_artist_id} marked as scraped.')
+
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+
+        except Exception:
+            printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Add related artist metadata to future artists ################
+        try:
+            printlog(f'Adding related artists metadata to future artists...')
+
+            for index, row in related_artists.iterrows():
+                add_artist(df=FUTURE_ARTISTS, artist_id=index, name=row['name'], genres=row['genres'], related=None, lat=None, lng=None)
+
+            printlog(f'Success adding related artists metadata to future artists.')
+
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+
+        except Exception:
+            printlog(f'Exception occured adding related artists metadata to future artists.!', e=True)
+            backup_dataframes()
+            break
+
+        ################## Get top tracks and albums ####################################
+        try:
+            # id: {artist_id: '', album_id: '', name: ''}
+            # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
+
+            # id: lyric string
+            # id: preview url (.mp3)
+            # id: album cover ulr (.jpg)
+
+            printlog(f'Getting top tracks for seed artist...')
+
+            tracks, albums, lyrics, previews, album_covers = fl_get_top_tracks_albums(
+                df_tracks=TRACKS,
+                df_albums=ALBUMS,
+                country=country, 
+                artist_name=artist_name, 
+                artist_id=seed_artist_id,
+                artist_lyrics=artist_lyrics
+            )    
+
+            if len(tracks) == 0:
+                printlog(f'No tracks found! Bummer, cant use this artist. Try next seed artist...')
+                num_seed_artists -= 1
+                continue
 
         except Exception:
             printlog('Exception occured getting tracks and albums!', e=True)
