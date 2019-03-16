@@ -1111,9 +1111,22 @@ if __name__=='__main__':
             printlog(f'Success getting related artists.')
 
         except Exception:
-            printlog('Exception occured getting related artists!', e=True)
-            backup_dataframes()
-            break
+            try:
+                printlog(f'This is too quick for spotify API sometimes, wait 5 sec and try again...')
+
+                time.sleep(5)
+
+                # id: '', name: '', genres: [], lat: ?, lng: ?
+                printlog(f'Getting related artists...')
+
+                related_artists = fr_get_related(res=SPOTIFY.artist_related_artists(seed_artist_id))
+
+                printlog(f'Success getting related artists.')   
+
+            except Exception:
+                printlog('Exception occured getting related artists!', e=True)
+                backup_dataframes()
+                break
 
         ################## Add related artists to seed artists ##########################
         try:
@@ -1479,9 +1492,22 @@ if __name__=='__main__':
             printlog(f'Success getting related artists.')
 
         except Exception:
-            printlog('Exception occured getting related artists!', e=True)
-            backup_dataframes()
-            break
+            try:
+                printlog(f'This is too quick for spotify API sometimes, wait 5 sec and try again...')
+
+                time.sleep(5)
+
+                # id: '', name: '', genres: [], lat: ?, lng: ?
+                printlog(f'Getting related artists...')
+
+                related_artists = fr_get_related(res=SPOTIFY.artist_related_artists(seed_artist_id))
+
+                printlog(f'Success getting related artists.')   
+
+            except Exception:
+                printlog('Exception occured getting related artists!', e=True)
+                backup_dataframes()
+                break
 
         ################## Add related artists to seed artists ##########################
         try:
