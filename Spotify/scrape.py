@@ -401,7 +401,7 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
     previews = {}
     album_covers = {}
     
-    if country is not None:
+    if country is not None and country != 'XK':
         res_home = SPOTIFY.artist_top_tracks(seed_artist_id, country=country)
         for track in res_home['tracks']:
             if track['preview_url'] is None:
