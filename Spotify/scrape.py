@@ -401,7 +401,7 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
     previews = {}
     album_covers = {}
     
-    if country is not None and country != 'XK':
+    if country is not None and country not in ['XK', 'US']:
         res_home = SPOTIFY.artist_top_tracks(seed_artist_id, country=country)
         for track in res_home['tracks']:
             if track['preview_url'] is None:
@@ -971,6 +971,7 @@ def get_artist_location(artist_name):
             raise Exception('Location could not be found in world city data')
         else:
             return location, country
+
     except Exception:
         try:
             printlog('Failed to get the location from MusicBrainz, try Wikipedia...', e=True)
@@ -986,46 +987,71 @@ def get_artist_location(artist_name):
             else:
                 return location, country
         except Exception:
-            printlog('Try Wikipedia again but add (Band)...')
             try:
-                mb_wid, origin, born = get_metadata_wiki(artist_name + ' (Band)')
-
-                if origin is not None and len(origin) >= 5:
-                    location, country = check_world_city_data(o=origin)
-                elif born is not None and len(born) >= 5:
-                    location, country = check_world_city_data(b=born)
-        
-                if location is None or country is None:
-                    raise Exception('Location could not be found in world city data')
+                if mb_wid is not None:
+                    printlog('Failed to get the location from Wikipedia, try MusicBrainz with wiki mb_id...', e=True)
+                    _, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
+                
+                    if area1 is not None and area2 is not None and area1 != '' and area2 != '':
+                        location, country = check_world_city_data(a1=area1, a2=area2)
+                    else:
+                        raise Exception('Not enough info for world city data')
+                
+                    if location is None or country is None:
+                        raise Exception('Location could not be found in world city data')
+                    else:
+                        return location, country
                 else:
-                    return location, country
+                    raise Exception('mb_wid is None')
             except Exception:
                 try:
-                    if mb_wid is not None:
-                        printlog('Failed to get the location from Wikipedia, try MusicBrainz with wiki mb_id...', e=True)
-                        _, area1, area2, area3 = get_metadata_mb_id(mb_wid, artist_name)
-                    
-                        if area1 is not None and area2 is not None and area1 != '' and area2 != '':
-                            location, country = check_world_city_data(a1=area1, a2=area2)
-                        else:
-                            raise Exception('Not enough info for world city data')
-                    
+                    printlog('Failed to get the location from world cities data, use google...', e=True)
+
+                    if area2 != area3:
+                        location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
+                    elif area2 is not None and area2 != '':
+                        location, country = get_lat_long(area1 + '+' + area2)
+                    elif area3 is not None and area3 != '':
+                        location, country = get_lat_long(area1 + '+' + area3)
+
+                    if location is None or country is None:
+                        
+                        if origin is not None and len(origin) >= 5:
+                            location, country = get_lat_long(origin)
+
+                        elif born is not None and len(born) >= 5:
+                            location, country = get_lat_long(born)
+
                         if location is None or country is None:
                             raise Exception('Location could not be found in world city data')
                         else:
                             return location, country
                     else:
-                        raise Exception('mb_wid is None')
-                except Exception:
-                    try:
-                        printlog('Failed to get the location from world cities data, use google...', e=True)
-                        if origin is not None and len(origin) >= 5:
-                            location, country = get_lat_long(origin)
-                        elif born is not None and len(born) >= 5:
-                            location, country = get_lat_long(born)
-                        else:
-                            location, country = get_lat_long(area1 + '+' + area2 + '+' + area3)
                         return location, country
+                except Exception:
+                    printlog('Try Wikipedia again but add (Band)...')
+                    try:
+                        mb_wid, origin, born = get_metadata_wiki(artist_name + ' (Band)')
+
+                        if origin is not None and len(origin) >= 5:
+                            location, country = check_world_city_data(o=origin)
+                        elif born is not None and len(born) >= 5:
+                            location, country = check_world_city_data(b=born)
+                
+                        if location is None or country is None:
+                            
+                            if origin is not None and len(origin) >= 5:
+                                location, country = get_lat_long(origin)
+
+                            elif born is not None and len(born) >= 5:
+                                location, country = get_lat_long(born)
+
+                            if location is None or country is None:
+                                raise Exception('Location could not be found in world city data')
+                            else:
+                                return location, country
+                        else:
+                            return location, country
                     except Exception:
                         try:
                             printlog('Failed to get the location from google, try MSD', e=True)
