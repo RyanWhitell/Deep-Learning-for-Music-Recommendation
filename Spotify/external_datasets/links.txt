@@ -1,3 +1,4 @@
+https://www.kaggle.com/rakannimer/billboard-lyrics
 https://www.kaggle.com/zaheenhamidani/ultimate-spotify-tracks-db
 https://www.kaggle.com/artimous/every-song-you-have-heard-almost
 https://www.kaggle.com/gyani95/380000-lyrics-from-metrolyrics

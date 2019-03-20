@@ -36,6 +36,10 @@ LYRICS3 = pd.read_csv(
 LYRICS4 = pd.read_csv(
     './songdata.csv'
 )
+LYRICS5 = pd.read_csv(
+    './billboard_lyrics_1964-2015.csv', 
+    encoding='latin-1'
+)
 
 artist, song, lyrics = [], [], []
 for _, row in LYRICS1.iterrows():
@@ -57,6 +61,12 @@ for _, row in LYRICS4.iterrows():
     artist.append(str(row['artist']).lower())
     song.append(str(row['song']).lower())
     lyrics.append(row['text'])
+
+for _, row in LYRICS5.iterrows():
+    if len(str(row['Lyrics'])) >= 12:
+        artist.append(str(row['Artist']).lower())
+        song.append(str(row['Song']).lower())
+        lyrics.append(row['Lyrics'])
 
 LYRICS = pd.DataFrame()
 LYRICS['artist'] = artist
