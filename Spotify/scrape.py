@@ -1487,7 +1487,7 @@ if __name__=='__main__':
             q = 'artist:' + str(artist_name)
             results = SPOTIFY.search(q=q, type='artist')
             
-            if len(results['artists']['items']) > 1:
+            if len(results['artists']['items']) >= 1:
                 if results['artists']['items'][0]['name'].lower() == artist_name:
                     seed_artist_id = results['artists']['items'][0]['id']
                     artist_metadata = fr_get_artist_metadata(res=results['artists']['items'][0])
