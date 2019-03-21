@@ -263,6 +263,21 @@ def fr_get_artist_metadata(res):
     return artist
 
 ####### Lyrics #######
+def clean_song_title(song_title):
+    song_title = re.sub(re.compile(r' -.*Radio.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Version.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Mix.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Extended.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Edit.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Remix.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Remastered.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Live.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Session.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*B-Side.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Bonus.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' \(feat.*', re.IGNORECASE), '', song_title)
+    return re.sub(re.compile(r' \(.*Version.*\)', re.IGNORECASE), '', song_title)
+
 def clean_lyrics(lyrics):
     lyrics = re.sub(re.compile(r'\[Produced by.*\]', re.IGNORECASE), '', lyrics)
     lyrics = re.sub(re.compile(r'\[Interlude.*\]', re.IGNORECASE), '', lyrics)
@@ -347,11 +362,19 @@ def get_lyrics_mm(song_title, artist_name):
    
 def get_track_lyrics(song_title, artist_name):
     printlog(f'get_track_lyrics({song_title}, {artist_name})')
+    
+    if len(song_title) != len(clean_song_title(song_title)):
+        printlog(f'Track lyric cleaned to "{clean_song_title(song_title)}"')
+        
+    song_title = clean_song_title(song_title)
+    
     printlog('Try Genius...')
     try:
         lyrics = get_lyrics_genius(song_title, artist_name)
         if len(lyrics) == 0:
             raise Exception('Lyrics empty')
+        if len(lyrics) >= 15000:
+            raise Exception('Lyrics too big')
     except Exception:
         printlog('Genius lyrics not found, try LYRICS data...', e=True)
         try:
@@ -360,30 +383,36 @@ def get_track_lyrics(song_title, artist_name):
             lyrics = clean_lyrics(lyrics)
             if len(lyrics) == 0:
                 raise Exception('Lyrics empty')
+            if len(lyrics) >= 15000:
+                raise Exception('Lyrics too big')
         except Exception:
-            """
             printlog('LYRICS lyrics not found, try wikia...', e=True)
             try:
                 lyrics = get_lyrics_wikia(song_title, artist_name)
                 if len(lyrics) == 0:
                     raise Exception('Lyrics empty')
+                if len(lyrics) >= 15000:
+                    raise Exception('Lyrics too big')
             except Exception:
                 printlog('wikia lyrics not found, try AZ...', e=True)
                 try:
                     lyrics = get_lyrics_az(song_title, artist_name)
                     if len(lyrics) == 0:
                         raise Exception('Lyrics empty')
+                    if len(lyrics) >= 15000:
+                        raise Exception('Lyrics too big')
                 except Exception:
-                    """
-            printlog('AZ lyrics not found, try mm...', e=True)
-            try:
-                lyrics = get_lyrics_mm(song_title, artist_name)
-                if len(lyrics) == 0:
-                    raise Exception('Lyrics empty')
-                lyrics = lyrics + '\n\n' + LYRICS_FOUND_BY_MM
-            except Exception:
-                printlog('No lyrics found, exit', e=True)
-                return None
+                    printlog('AZ lyrics not found, try mm...', e=True)
+                    try:
+                        lyrics = get_lyrics_mm(song_title, artist_name)
+                        if len(lyrics) == 0:
+                            raise Exception('Lyrics empty')
+                        if len(lyrics) >= 15000:
+                            raise Exception('Lyrics too big')
+                        lyrics = lyrics + '\n\n' + LYRICS_FOUND_BY_MM
+                    except Exception:
+                        printlog('No lyrics found, exit', e=True)
+                        return None
 
     return lyrics
 
