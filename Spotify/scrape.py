@@ -265,6 +265,7 @@ def fr_get_artist_metadata(res):
 ####### Lyrics #######
 def clean_song_title(song_title):
     song_title = re.sub(re.compile(r' -.*Radio.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' -.*Cut.*', re.IGNORECASE), '', song_title)
     song_title = re.sub(re.compile(r' -.*Version.*', re.IGNORECASE), '', song_title)
     song_title = re.sub(re.compile(r' -.*Mix.*', re.IGNORECASE), '', song_title)
     song_title = re.sub(re.compile(r' -.*Extended.*', re.IGNORECASE), '', song_title)
