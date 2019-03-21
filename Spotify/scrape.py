@@ -1226,12 +1226,21 @@ if __name__=='__main__':
             backup_dataframes()
             break
 
+
         ################## Add related artist metadata to future artists ################
         try:
             printlog(f'Adding related artists metadata to future artists...')
 
             for index, row in related_artists.iterrows():
-                add_artist(df=FUTURE_ARTISTS, artist_id=index, name=row['name'], genres=row['genres'], related=None, lat=None, lng=None)
+                if index not in FUTURE_ARTISTS.index:
+                    try:
+                        r = []
+                        for artist in SPOTIFY.artist_related_artists(index)['artists']:
+                            r.append(artist['id'])
+                        if len(r) > 0:
+                            add_artist(df=FUTURE_ARTISTS, artist_id=index, name=row['name'], genres=row['genres'], related=r, lat=None, lng=None)
+                    except:
+                        printlog(f'Problem occured getting related artists for artist with id: {index}')
 
             printlog(f'Success adding related artists metadata to future artists.')
 
@@ -1613,8 +1622,16 @@ if __name__=='__main__':
             printlog(f'Adding related artists metadata to future artists...')
 
             for index, row in related_artists.iterrows():
-                add_artist(df=FUTURE_ARTISTS, artist_id=index, name=row['name'], genres=row['genres'], related=None, lat=None, lng=None)
-
+                if index not in FUTURE_ARTISTS.index:
+                    try:
+                        r = []
+                        for artist in SPOTIFY.artist_related_artists(index)['artists']:
+                            r.append(artist['id'])
+                        if len(r) > 0:
+                            add_artist(df=FUTURE_ARTISTS, artist_id=index, name=row['name'], genres=row['genres'], related=r, lat=None, lng=None)
+                    except:
+                        printlog(f'Problem occured getting related artists for artist with id: {index}')
+                        
             printlog(f'Success adding related artists metadata to future artists.')
 
             save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
