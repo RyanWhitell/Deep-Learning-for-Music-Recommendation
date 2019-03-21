@@ -388,6 +388,12 @@ def get_track_lyrics(song_title, artist_name):
     return lyrics
 
 ####### Track #######
+def compare_lyrics(lyrics_list, lyrics):
+    for _, v in lyrics_list.items():
+        if v == lyrics:
+            return False
+    return True
+
 def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_id):  
     # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
     col =  ['artist_id', 'name', 'release_date', 'release_date_precision']
@@ -418,7 +424,7 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
             except Exception:
                 continue
 
-            if lyrics is not None:
+            if lyrics is not None and compare_lyrics(lyrics_list, lyrics):
                 printlog(
                     str(track['id']) +
                     ' : ' + str(track['name'])
@@ -474,7 +480,7 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
                 except Exception:
                     continue
 
-                if lyrics is not None:
+                if lyrics is not None and compare_lyrics(lyrics_list, lyrics):
                     printlog(
                         str(track['id']) +
                         ' : ' + str(track['name'])
@@ -514,7 +520,7 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
             except Exception:
                 continue
 
-            if lyrics is not None:
+            if lyrics is not None and compare_lyrics(lyrics_list, lyrics):
                 printlog(
                     str(track['id']) +
                     ' : ' + str(track['name'])
@@ -954,7 +960,6 @@ def get_metadata_mb_id(mb_id, artist_name):
     return mb_id, area1, area2, area3
 
 def get_artist_location(artist_name):
-    # $61.30 for 7097 artists 
     mb_wid, area1, area2, area3, = None, None, None, None
     origin, born, country, location = None, None, None, None 
 
