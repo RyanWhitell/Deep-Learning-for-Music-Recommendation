@@ -368,6 +368,8 @@ def get_track_lyrics(song_title, artist_name):
         
     song_title = clean_song_title(song_title)
     
+    ytbr = 'Lyrics for this song have yet to be released. Please check back once the song has been released.'
+    
     printlog('Try Genius...')
     try:
         lyrics = get_lyrics_genius(song_title, artist_name)
@@ -375,6 +377,8 @@ def get_track_lyrics(song_title, artist_name):
             raise Exception('Lyrics empty')
         if len(lyrics) >= 15000:
             raise Exception('Lyrics too big')
+        if ytbr in lyrics:
+            raise Exception('Lyrics yet to be released')
     except Exception:
         printlog('Genius lyrics not found, try LYRICS data...', e=True)
         try:
