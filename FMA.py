@@ -97,7 +97,8 @@ class FreeMusicArchive:
                 labels[index] = class_map[row['genre_top']]
 
             return labels, class_map, len(class_map)
-        else:
+            
+        elif fma_set == 'medium':
             labels = {}
             class_map = {}
             cnt = 0
@@ -109,6 +110,9 @@ class FreeMusicArchive:
                 labels[index] = class_map[row['genre_top']]
 
             return labels, class_map, len(class_map)
+
+        else:
+            return None, None, None
 
     def get_filenames(self, filepath):
         names = os.listdir(filepath)
