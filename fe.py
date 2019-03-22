@@ -46,24 +46,6 @@ def get_fma_stft(track_id):
     
     return track_id, scaler.fit_transform(lr.amplitude_to_db(np.abs(spectrum[:,:643])))
 
-def extract_fma_stft(ids, fma_set, quick, cores):
-    if quick:
-        ids = ids[:100]
-        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_stft.hdf5', 'a')
-    else:
-        f = h5py.File('./Data/features/fma_' + fma_set + '_stft.hdf5', 'a')
-
-    data = f.create_group('data')
-    
-    pool = multiprocessing.Pool(cores)
-
-    for i, spec in tqdm(pool.imap_unordered(get_fma_stft, ids), total=len(ids)):
-        if spec is not None:
-            data[str(i)] = spec
-
-    f.close()
-
-
 def get_fma_stft_halved(track_id):
     scaler = sklearn.preprocessing.StandardScaler()
 
@@ -84,25 +66,7 @@ def get_fma_stft_halved(track_id):
         print('*'*20, str(track_id))
         return track_id, None
     
-    return track_id, scaler.fit_transform(lr.amplitude_to_db(np.abs(spectrum[:,:643])))
-
-def extract_fma_stft_halved(ids, fma_set, quick, cores):
-    if quick:
-        ids = ids[:100]
-        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_stft_halved.hdf5', 'a')
-    else:
-        f = h5py.File('./Data/features/fma_' + fma_set + '_stft_halved.hdf5', 'a')
-
-    data = f.create_group('data')
-    
-    pool = multiprocessing.Pool(cores)
-
-    for i, spec in tqdm(pool.imap_unordered(get_fma_stft_halved, ids), total=len(ids)):
-        if spec is not None:
-            data[str(i)] = spec[0:1024,:]
-
-    f.close()
-
+    return track_id, scaler.fit_transform(lr.amplitude_to_db(np.abs(spectrum[:,:643])))[0:1024,:]
 
 def get_fma_mel_scaled_stft(track_id):
     scaler = sklearn.preprocessing.StandardScaler()
@@ -126,24 +90,6 @@ def get_fma_mel_scaled_stft(track_id):
     
     return track_id, scaler.fit_transform(lr.power_to_db(mel_spec[:,:643]))
 
-def extract_fma_mel_scaled_stft(ids, fma_set, quick, cores):
-    if quick:
-        ids = ids[:100]
-        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_mel_scaled_stft.hdf5', 'a')
-    else:
-        f = h5py.File('./Data/features/fma_' + fma_set + '_mel_scaled_stft.hdf5', 'a')
-
-    data = f.create_group('data')
-    
-    pool = multiprocessing.Pool(cores)
-
-    for i, spec in tqdm(pool.imap_unordered(get_fma_mel_scaled_stft, ids), total=len(ids)):
-        if spec is not None:
-            data[str(i)] = spec
-
-    f.close()
-
-
 def get_fma_cqt(track_id):
     scaler = sklearn.preprocessing.StandardScaler()
 
@@ -163,24 +109,6 @@ def get_fma_cqt(track_id):
         return track_id, None
     
     return track_id, scaler.fit_transform(lr.amplitude_to_db(cqt[:,:643]))
-
-def extract_fma_cqt(ids, fma_set, quick, cores):
-    if quick:
-        ids = ids[:100]
-        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_cqt.hdf5', 'a')
-    else:
-        f = h5py.File('./Data/features/fma_' + fma_set + '_cqt.hdf5', 'a')
-
-    data = f.create_group('data')
-    
-    pool = multiprocessing.Pool(cores)
-
-    for i, spec in tqdm(pool.imap_unordered(get_fma_cqt, ids), total=len(ids)):
-        if spec is not None:
-            data[str(i)] = spec
-
-    f.close()
-
 
 def get_fma_chroma(track_id):
     scaler = sklearn.preprocessing.StandardScaler()
@@ -208,24 +136,6 @@ def get_fma_chroma(track_id):
 
     return track_id, scaler.fit_transform(chroma[:,:643])
 
-def extract_fma_chroma(ids, fma_set, quick, cores):
-    if quick:
-        ids = ids[:100]
-        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_chroma.hdf5', 'a')
-    else:
-        f = h5py.File('./Data/features/fma_' + fma_set + '_chroma.hdf5', 'a')
-
-    data = f.create_group('data')
-    
-    pool = multiprocessing.Pool(cores)
-
-    for i, spec in tqdm(pool.imap_unordered(get_fma_chroma, ids), total=len(ids)):
-        if spec is not None:
-            data[str(i)] = spec
-
-    f.close()
-
-
 def get_fma_mfcc(track_id):
     scaler = sklearn.preprocessing.StandardScaler()
 
@@ -249,23 +159,38 @@ def get_fma_mfcc(track_id):
     
     return track_id, scaler.fit_transform(mfcc[:,:643])
 
-def extract_fma_mfcc(ids, fma_set, quick, cores):
+def extract(ids, fma_set, features, quick, cores):
     if quick:
         ids = ids[:100]
-        f = h5py.File('./Data/features/DELETE.fma_' + fma_set + '_mfcc.hdf5', 'a')
+        file_path = './Data/features/DELETE.fma_' + fma_set + '_' + features + '.hdf5'
     else:
-        f = h5py.File('./Data/features/fma_' + fma_set + '_mfcc.hdf5', 'a')
+        file_path = './Data/features/fma_' + fma_set + '_' + features + '.hdf5'
+    
+    if os.path.isfile(file_path):
+        f = h5py.File(file_path, 'a')
+        data = f['data']
+        ids = list(set(ids) - set([int(x) for x in data.keys()]))
+        print(f'File already in path, attempting to add missing ids of which there are {len(ids)}')
+    else:
+        f = h5py.File(file_path, 'a')
+        data = f.create_group('data')
 
-    data = f.create_group('data')
+    func = {
+        'stft': get_fma_stft, 
+        'stft_halved': get_fma_stft_halved,
+        'mel_scaled_stft': get_fma_mel_scaled_stft,
+        'cqt': get_fma_cqt,
+        'chroma': get_fma_chroma,
+        'mfcc': get_fma_mfcc
+    }
 
     pool = multiprocessing.Pool(cores)
 
-    for i, spec in tqdm(pool.imap_unordered(get_fma_mfcc, ids), total=len(ids)):
+    for i, spec in tqdm(pool.imap_unordered(func[features], ids), total=len(ids)):
         if spec is not None:
             data[str(i)] = spec
 
     f.close()
-
 
 
 if __name__=='__main__':
@@ -276,34 +201,12 @@ if __name__=='__main__':
         FMA = FMA.FreeMusicArchive('medium', 22050)
         ids = FMA.TRACKS.index.values
 
-        if args.features == 'stft':
-            extract_fma_stft(ids, 'med', args.quick, int(args.cores))
-        if args.features == 'stft_halved':
-            extract_fma_stft_halved(ids, 'med', args.quick, int(args.cores))
-        if args.features == 'mel_scaled_stft':
-            extract_fma_mel_scaled_stft(ids, 'med', args.quick, int(args.cores))
-        if args.features == 'cqt':
-            extract_fma_cqt(ids, 'med', args.quick, int(args.cores))
-        if args.features == 'chroma':
-            extract_fma_chroma(ids, 'med', args.quick, int(args.cores))
-        if args.features == 'mfcc':
-            extract_fma_mfcc(ids, 'med', args.quick, int(args.cores))
+        extract(ids, 'med', args.features, args.quick, int(args.cores))
 
     if args.dataset == 'fma_large':
         FMA = FMA.FreeMusicArchive('large', 22050)
         ids = FMA.TRACKS.index.values
 
-        if args.features == 'stft':
-            extract_fma_stft(ids, 'large', args.quick, int(args.cores))
-        if args.features == 'stft_halved':
-            extract_fma_stft_halved(ids, 'large', args.quick, int(args.cores))
-        if args.features == 'mel_scaled_stft':
-            extract_fma_mel_scaled_stft(ids, 'large', args.quick, int(args.cores))
-        if args.features == 'cqt':
-            extract_fma_cqt(ids, 'large', args.quick, int(args.cores))
-        if args.features == 'chroma':
-            extract_fma_chroma(ids, 'large', args.quick, int(args.cores))
-        if args.features == 'mfcc':
-            extract_fma_mfcc(ids, 'large', args.quick, int(args.cores))
+        extract(ids, 'large', args.features, args.quick, int(args.cores))
 
     print(f'Total file execution time: {time.perf_counter()-file_start:.2f}s')
