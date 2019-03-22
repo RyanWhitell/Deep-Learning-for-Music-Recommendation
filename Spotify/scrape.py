@@ -69,6 +69,8 @@ parser = argparse.ArgumentParser(description="scrapes various apis for music con
 parser.add_argument('-n', '--num-seed-artists', default=0, help='number of seed_artists to scrape')
 parser.add_argument('-c', '--random', default=False, help='grab random seed artists rather than from the top')
 parser.add_argument('-s', '--seeds', default=None, help='injects seed artists via comma separated list')
+parser.add_argument('-b', '--seeds-bolster', default=False, help='use bolster seed artists list instead of seed artist list')
+parser.add_argument('-m', '--merge-seeds-bolster', default=False, help='merge the bolster list with the seeds list')
 parser.add_argument('-t', '--seeds-top', default=False, help='inject seeds at the top of the list')
 parser.add_argument('-r', '--seeds-reset', default=False, help='reset seed artists that failed so they can run a second time')
 parser.add_argument('-u', '--set-seed-unscraped', default=None, help='sets a seed as unscraped')
@@ -89,6 +91,7 @@ def get_dataframes():
             artists = save['artists']
             future_artists = save['future_artists']
             seed_artists = save['seed_artists']
+            bolster_artists = save['bolster_artists']
             albums = save['albums']
             tracks = save['tracks']
             del save
@@ -102,6 +105,10 @@ def get_dataframes():
         col =  ['has_been_scraped']
         seed_artists = pd.DataFrame(columns=col)
 
+        # id: {has_been_scraped: bool}
+        col =  ['has_been_scraped']
+        bolster_artists = pd.DataFrame(columns=col)
+        
         # id: {artist_id: '', name: '', release_date: '', release_date_precision: ''}
         col =  ['artist_id', 'name', 'release_date', 'release_date_precision']
         albums = pd.DataFrame(columns=col)
@@ -110,14 +117,14 @@ def get_dataframes():
         col =  ['artist_id', 'album_id', 'name']
         tracks = pd.DataFrame(columns=col)
 
-    return artists, future_artists, seed_artists, albums, tracks
+    return artists, future_artists, seed_artists, bolster_artists, albums, tracks
 
 def backup_dataframes():
     if os.path.isfile('./data.pickle'):
         printlog('Backing up data file...')
         copyfile('./data.pickle', './backups/' + NOW + '_' + 'data.pickle')
 
-def save_dataframes(artists, future_artists, seed_artists, albums, tracks):
+def save_dataframes(artists, future_artists, seed_artists, bolster_artists, albums, tracks):
     backup_dataframes()
 
     with open('./data.pickle', 'wb') as f:
@@ -125,6 +132,7 @@ def save_dataframes(artists, future_artists, seed_artists, albums, tracks):
             'artists': artists,
             'future_artists': future_artists,
             'seed_artists': seed_artists,
+            'bolster_artists': bolster_artists,
             'albums': albums,
             'tracks': tracks
         }
@@ -144,17 +152,24 @@ def get_new_random_artist_from_lyrics(df_artists):
     else:
         return get_new_random_artist_from_lyrics(df_artists=df_artists)
 
-def inject_seed_artists(df, list_ids, top=False):
-    if top:
+def inject_seed_artists(df, list_ids, top=False, dfb=None, bolster=False):
+    if bolster:
+        for i in list_ids:
+            if i in df.index:
+                if not df.loc[i].has_been_scraped:
+                    dfb.loc[i] = False
+            else:
+                dfb.loc[i] = False
+    elif top:
         df_top = pd.DataFrame(columns=['has_been_scraped'])
         for i in list_ids:
             df_top.loc[i] = False
-        return pd.concat([df_top, df])
+        return pd.concat([df_top, df])[~pd.concat([df_top, df]).index.duplicated(keep='first')]
     else:
         for i in list_ids:
             if i not in df.index:
                 df.loc[i] = False
-            
+
 def get_next_seed_artist(seed_artists, r=False):
     if r:
         try:
@@ -167,8 +182,10 @@ def get_next_seed_artist(seed_artists, r=False):
         except IndexError:
             return -1
 
-def mark_seed_as_scraped(df, seed_artist_id):
+def mark_seed_as_scraped(df, seed_artist_id, dfb, bolster):
     df.loc[seed_artist_id] = True
+    if bolster:
+        dfb.loc[seed_artist_id] = True
 
 def mark_seed_as_unscraped(df, seed_artist_id):
     df.loc[seed_artist_id] = False
@@ -1062,32 +1079,44 @@ if __name__=='__main__':
     printlog('File Start...')
     file_start = time.perf_counter()
 
-    ARTISTS, FUTURE_ARTISTS, SEED_ARTISTS, ALBUMS, TRACKS = get_dataframes()
+    ARTISTS, FUTURE_ARTISTS, SEED_ARTISTS, BOLSTER_ARTISTS, ALBUMS, TRACKS = get_dataframes()
     backup_dataframes()
 
     if args.seeds_reset:
         printlog(f'Marking seeds that failed as unscraped....')
         try:
             reset_failed_seed_artists(seed=SEED_ARTISTS, artists=ARTISTS)
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
         except Exception:
             printlog(f'Exception occured, could not mark failed seeds as unscraped', e=True)
 
     if args.set_seed_unscraped is not None:
         printlog(f'Marking seed {args.set_seed_unscraped} as unscraped....')
         try:
-            mark_seed_as_unscraped(df=SEED_ARTISTS, seed_artist_id=args.set_seed_unscraped)
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            if args.seeds_bolster:
+                mark_seed_as_unscraped(df=BOLSTER_ARTISTS, seed_artist_id=args.set_seed_unscraped)
+            else:
+                mark_seed_as_unscraped(df=SEED_ARTISTS, seed_artist_id=args.set_seed_unscraped)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
         except Exception:
             printlog(f'Exception occured, could not mark seed as unscraped', e=True)
 
     if args.seeds is not None:
         printlog(f'Adding {args.seeds} to seed_artists list...')
         try:
-            SEED_ARTISTS = inject_seed_artists(df=SEED_ARTISTS, list_ids=args.seeds.split(','), top=args.seeds_top)
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            if args.seeds_top:
+                SEED_ARTISTS = inject_seed_artists(df=SEED_ARTISTS, list_ids=args.seeds.split(','), top=args.seeds_top)
+            else:
+                inject_seed_artists(df=SEED_ARTISTS, list_ids=args.seeds.split(','), dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
+
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
         except Exception:
             printlog(f'Exception occured, could not add seeds {args.seeds}', e=True)
+
+    if args.merge_seeds_bolster:
+        SEED_ARTISTS = pd.concat([SEED_ARTISTS, BOLSTER_ARTISTS])[~pd.concat([SEED_ARTISTS, BOLSTER_ARTISTS]).index.duplicated(keep='first')]
+        BOLSTER_ARTISTS = BOLSTER_ARTISTS.iloc[0:0]
+        save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
     num_seed_artists = int(args.num_seed_artists)
 
@@ -1096,7 +1125,11 @@ if __name__=='__main__':
         try:
             printlog('Getting next artist from seed_artists...')
 
-            seed_artist_id = get_next_seed_artist(seed_artists=SEED_ARTISTS, r=args.random)
+            if args.seeds_bolster:
+                seed_artist_id = get_next_seed_artist(seed_artists=BOLSTER_ARTISTS, r=args.random)
+            else:
+                seed_artist_id = get_next_seed_artist(seed_artists=SEED_ARTISTS, r=args.random)
+
             printlog(f'{seed_artist_id} obtained as the next seed artist')
 
             if seed_artist_id == -1:
@@ -1119,32 +1152,31 @@ if __name__=='__main__':
             printlog(f'Success getting related artists.')
 
         except Exception:
+            printlog(f'Exception occured getting related artists! Bummer, cant use this artist. Try next seed artist...', e=True)
+            
             try:
-                printlog(f'This is too quick for spotify API sometimes, wait 5 sec and try again...')
-
-                time.sleep(5)
-
-                # id: '', name: '', genres: [], lat: ?, lng: ?
-                printlog(f'Getting related artists...')
-
-                related_artists = fr_get_related(res=SPOTIFY.artist_related_artists(seed_artist_id))
-
-                printlog(f'Success getting related artists.')   
-
+                printlog(f'Mark {seed_artist_id} as scraped...')
+                mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id, dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
+                printlog(f'{seed_artist_id} marked as scraped.')
+                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
             except Exception:
-                printlog('Exception occured getting related artists!', e=True)
+                printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
                 backup_dataframes()
                 break
+
+            num_seed_artists -= 1
+            backup_dataframes()
+            continue
 
         ################## Add related artists to seed artists ##########################
         try:
             printlog(f'Adding related artists to seed_artists list...')
 
-            inject_seed_artists(df=SEED_ARTISTS, list_ids=related_artists.index.values)
+            inject_seed_artists(df=SEED_ARTISTS, list_ids=related_artists.index.values, dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
 
             printlog(f'Related added to seed_artists list.')
 
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured adding related artists to seeds!', e=True)
@@ -1155,11 +1187,11 @@ if __name__=='__main__':
         try:
             printlog(f'Mark {seed_artist_id} as scraped...')
 
-            mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id)
+            mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id, dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
 
             printlog(f'{seed_artist_id} marked as scraped.')
 
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
@@ -1184,7 +1216,7 @@ if __name__=='__main__':
 
             printlog(f'Success adding related artists metadata to future artists.')
 
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured adding related artists metadata to future artists.!', e=True)
@@ -1361,7 +1393,7 @@ if __name__=='__main__':
                     lng=artist_metadata.loc[seed_artist_id]['lng']
                 )
 
-                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
                 ################## Move temp files out of temp ##################################
                 time.sleep(5)
@@ -1435,8 +1467,14 @@ if __name__=='__main__':
         for lyric in [n for n in glob.glob("./lyrics/temp/*.txt")]:
             os.remove(lyric)
 
-        if not integrityIsGood:
+        if integrityIsGood:
+            num_seed_artists -= 1
+            printlog(f'Seed artists left: {num_seed_artists}')
+        else:
             break
+
+        if args.seeds_bolster:
+            continue
 
         ################## Get data starting with LYRICS ################################
         ################## Get next seed artist #########################################
@@ -1509,32 +1547,31 @@ if __name__=='__main__':
             printlog(f'Success getting related artists.')
 
         except Exception:
+            printlog(f'Exception occured getting related artists! Bummer, cant use this artist. Try next seed artist...', e=True)
+            
             try:
-                printlog(f'This is too quick for spotify API sometimes, wait 5 sec and try again...')
-
-                time.sleep(5)
-
-                # id: '', name: '', genres: [], lat: ?, lng: ?
-                printlog(f'Getting related artists...')
-
-                related_artists = fr_get_related(res=SPOTIFY.artist_related_artists(seed_artist_id))
-
-                printlog(f'Success getting related artists.')   
-
+                printlog(f'Mark {seed_artist_id} as scraped...')
+                mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id, dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
+                printlog(f'{seed_artist_id} marked as scraped.')
+                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
             except Exception:
-                printlog('Exception occured getting related artists!', e=True)
+                printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
                 backup_dataframes()
                 break
+
+            num_seed_artists -= 1
+            backup_dataframes()
+            continue
 
         ################## Add related artists to seed artists ##########################
         try:
             printlog(f'Adding related artists to seed_artists list...')
 
-            inject_seed_artists(df=SEED_ARTISTS, list_ids=related_artists.index.values)
+            inject_seed_artists(df=SEED_ARTISTS, list_ids=related_artists.index.values, dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
 
             printlog(f'Related added to seed_artists list.')
 
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured adding related artists to seeds!', e=True)
@@ -1545,12 +1582,12 @@ if __name__=='__main__':
         try:
             printlog(f'Mark {seed_artist_id} as scraped...')
 
-            inject_seed_artists(df=SEED_ARTISTS, list_ids=[seed_artist_id])
-            mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id)
+            inject_seed_artists(df=SEED_ARTISTS, list_ids=[seed_artist_id], dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
+            mark_seed_as_scraped(df=SEED_ARTISTS, seed_artist_id=seed_artist_id, dfb=BOLSTER_ARTISTS, bolster=args.seeds_bolster)
 
             printlog(f'{seed_artist_id} marked as scraped.')
 
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured marking {seed_artist_id} as scraped!', e=True)
@@ -1574,7 +1611,7 @@ if __name__=='__main__':
                         
             printlog(f'Success adding related artists metadata to future artists.')
 
-            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+            save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
         except Exception:
             printlog(f'Exception occured adding related artists metadata to future artists.!', e=True)
@@ -1698,7 +1735,7 @@ if __name__=='__main__':
                     lng=artist_metadata.loc[seed_artist_id]['lng']
                 )
 
-                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, albums=ALBUMS, tracks=TRACKS)
+                save_dataframes(artists=ARTISTS, future_artists=FUTURE_ARTISTS, seed_artists=SEED_ARTISTS, bolster_artists=BOLSTER_ARTISTS, albums=ALBUMS, tracks=TRACKS)
 
                 ################## Move temp files out of temp ##################################
                 time.sleep(5)
