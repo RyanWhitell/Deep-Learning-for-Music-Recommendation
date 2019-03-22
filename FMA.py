@@ -13,13 +13,26 @@ class FreeMusicArchive:
         self.META_ECHO_PATH = './Data/fma_metadata/echonest.csv'
         self.DATA_PATH = './Data/fma_large'
 
+
+        # MP3 files that cause librosa to throw audioread.NoBackendError
+        self.FILES_CORRUPT = [
+            2624, 3284, 8669, 10116, 11583, 12838, 13529, 14116, 14180, 20814, 22554, 23429, 23430, 23431, 25173, 25174,
+            25175, 25176, 25180, 29345, 29346, 29352, 29356, 33411, 33413, 33414, 33417, 33418, 33419, 33425, 35725, 39363, 84504, 94052,
+            41745, 42986, 43753, 50594, 50782, 53668, 54569, 54582, 61480, 61822, 63422, 63997, 72656, 72980, 73510, 80553, 82699, 84503, 
+            84522, 84524, 86656, 86659, 86661, 86664, 87057, 90244, 90245, 90247, 90248, 90250, 90252, 90253, 90442, 90445, 91206, 92479, 
+            94234, 95253, 96203, 96207, 96210, 98105, 98562, 101265, 101272, 101275, 102241, 102243, 102247, 102249, 102289, 106409, 106412, 
+            106415, 106628, 108920, 109266, 110236, 115610, 117441, 127928, 129207, 129800, 130328, 130748, 130751, 131545, 133641, 133647, 
+            134887, 140449, 140450, 140451, 140452, 140453, 140454, 140455, 140456, 140457, 140458, 140459, 140460, 140461, 140462, 140463, 
+            140464, 140465, 140466, 140467, 140468, 140469, 140470, 140471, 140472, 142614, 144518, 144619, 145056, 146056, 147419, 147424, 
+            148786, 148787, 148788, 148789, 148790, 148791, 148792, 148793, 148794, 148795, 151920, 155051
+        ]
         # MP3 file IDs with 0 second of audio.
         self.FILES_NO_AUDIO = [1486, 5574, 65753, 80391, 98558, 98559, 98560, 98571, 99134, 105247, 108925, 126981, 127336, 133297, 143992]
         # MP3 train file IDs with less than 30 seconds of audio.
         self.FILES_SHORT = [98565, 98566, 98567, 98568, 98569, 108924]
         # MP3 files that are wierd or distorted
         self.FILES_DISTORTED = [107535, 48949, 44374]
-        self.FILES_FAULTY = self.FILES_NO_AUDIO + self.FILES_SHORT + self.FILES_DISTORTED
+        self.FILES_FAULTY = self.FILES_NO_AUDIO + self.FILES_SHORT + self.FILES_DISTORTED + self.FILES_CORRUPT
 
         self.TRACKS, self.PARTITION = self.get_metadata(fma_set)
 
@@ -97,7 +110,7 @@ class FreeMusicArchive:
                 labels[index] = class_map[row['genre_top']]
 
             return labels, class_map, len(class_map)
-            
+
         elif fma_set == 'medium':
             labels = {}
             class_map = {}
