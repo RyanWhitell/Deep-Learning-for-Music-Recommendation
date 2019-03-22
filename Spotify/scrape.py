@@ -72,7 +72,6 @@ parser.add_argument('-s', '--seeds', default=None, help='injects seed artists vi
 parser.add_argument('-t', '--seeds-top', default=False, help='inject seeds at the top of the list')
 parser.add_argument('-r', '--seeds-reset', default=False, help='reset seed artists that failed so they can run a second time')
 parser.add_argument('-u', '--set-seed-unscraped', default=None, help='sets a seed as unscraped')
-parser.add_argument('-p', '--print-top-genres', default=False, help='prints top genres sorted by count')
 args = parser.parse_args()
 
 ####### Utility #######
@@ -133,56 +132,6 @@ def save_dataframes(artists, future_artists, seed_artists, albums, tracks):
         del save
 
     printlog('data.pickle saved succesfully!')
-
-def print_top_genres(df, top_genres):
-    genre_counts = pd.DataFrame(columns=['count'])
-    for genre_list in df.genres.values:
-        for genre in genre_list:
-            if genre in genre_counts.index:
-                genre_counts.loc[genre] += 1
-            else:
-                genre_counts.loc[genre] = 1
-
-    genre_counts = genre_counts.sort_values(by=['count'])
-    
-    top_genres_sorted = []
-    for genre in genre_counts.index:
-        if genre in top_genres:
-            top_genres_sorted.append(genre)
-
-    has_top_genre = []
-    top_genre_counts = pd.DataFrame(columns=['count'])
-    for genre in top_genres_sorted:
-        top_genre_counts.loc[genre] = 0
-
-    for genre in top_genres_sorted:
-        for index, row in df.iterrows():
-            if index not in has_top_genre:
-                if genre in row['genres']:
-                    has_top_genre.append(index)
-                    top_genre_counts.loc[genre] += 1
-
-    for genre in top_genres_sorted:
-        for index, row in df.iterrows():
-            if index not in has_top_genre:
-                if genre in ' '.join(row['genres']):
-                    has_top_genre.append(index)
-                    top_genre_counts.loc[genre] += 1  
-                    
-    genre_counts = pd.DataFrame(columns=['count'])
-    for genre_list in df.loc[set(df.index) - set(has_top_genre)].genres.values:
-        for genre in genre_list:
-            if genre in genre_counts.index:
-                genre_counts.loc[genre] += 1
-            else:
-                genre_counts.loc[genre] = 1
-                
-                
-    genre_counts = genre_counts.sort_values(by=['count'])
-    printlog(genre_counts)
-
-    top_genre_counts = top_genre_counts.sort_values(by=['count'])
-    printlog(top_genre_counts)
 
 def reset_failed_seed_artists(seed, artists):
     seed.loc[set(seed.loc[seed.has_been_scraped == True].index) - set(artists.index)] = False
@@ -1115,15 +1064,6 @@ if __name__=='__main__':
 
     ARTISTS, FUTURE_ARTISTS, SEED_ARTISTS, ALBUMS, TRACKS = get_dataframes()
     backup_dataframes()
-
-    if args.print_top_genres:
-        top_genres = [
-            'classic rock', 'alternative rock', 'indie rock', 'psychedelic rock', 'rock', 'dance pop', 'pop', 
-            'punk', 'experimental', 'soul', 'electronic', 'funk', 'r&b', 'christmas', 'hip hop', 'rap', 
-            'rockabilly', 'grunge', 'industrial', 'reggae', 'country', 'blues', 'emo', 'video game music',
-            'ska', 'jazz', 'disco', 'edm', 'doo-wop', 'lo-fi', 'metal', 'folk', 'soundtrack'
-        ]
-        print_top_genres(df=ARTISTS, top_genres=top_genres)
 
     if args.seeds_reset:
         printlog(f'Marking seeds that failed as unscraped....')
