@@ -160,7 +160,7 @@ if __name__ == '__main__':
             freq, time = 168, 643
             dim = (freq, time)
 
-        if args.features == 'chroma':
+        if args.features in ['chroma', 'mfcc']:
             freq, time = 12, 643
             dim = (freq, time)
         

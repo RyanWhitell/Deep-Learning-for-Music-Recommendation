@@ -19,14 +19,14 @@ import FMA
 parser = argparse.ArgumentParser(description="trains a model")
 parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
 parser.add_argument('-t', '--test', default='', help='test to carry out: sgc')
-parser.add_argument('-f', '--features', default='', help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma')
+parser.add_argument('-f', '--features', default='', help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
 
 """
 Valid test combinations:
-fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma
 cifar100
+fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 """
 
 class DataGenerator(keras.utils.Sequence):
@@ -73,7 +73,7 @@ class DataGenerator(keras.utils.Sequence):
         X = np.empty((self.batch_size, *self.dim))
         y = np.empty((self.batch_size), dtype=int)
 
-        with h5py.File(self.data_path) as f:
+        with h5py.File(self.data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
                 X[i,] = f['data'][str(ID)]
                 y[i] = self.labels[ID]
@@ -120,7 +120,7 @@ def train_model(model, model_name, dim, features, dataset, quick):
                 list_IDs=train_list,
                 labels=labels,
                 batch_size=8,
-                dim=dim,
+                dim=(dim[0], dim[1]),
                 n_classes=num_classes,
                 features=features,
                 dataset=dataset
@@ -135,7 +135,7 @@ def train_model(model, model_name, dim, features, dataset, quick):
                 list_IDs=val_list,
                 labels=labels,
                 batch_size=vbs,
-                dim=dim,
+                dim=(dim[0], dim[1]),
                 n_classes=num_classes,
                 features=features,
                 dataset=dataset,
@@ -196,7 +196,7 @@ def train_model(model, model_name, dim, features, dataset, quick):
 def Simple(features, input_shape, num_classes):
     inputs = layers.Input(shape=input_shape)
 
-    if features in ['chroma', 'cifar100']:
+    if features in ['chroma', 'mfcc', 'cifar100']:
         s, pad = 1, 'same'
     else:
         s, pad = 2, 'valid'
@@ -211,7 +211,7 @@ def Simple(features, input_shape, num_classes):
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
     
-    if features in ['mel_scaled_stft', 'cqt', 'chroma', 'cifar100']:
+    if features in ['mel_scaled_stft', 'cqt', 'chroma', 'mfcc', 'cifar100']:
         x = layers.Conv2D(16, (3, 3), strides=(1, 1), use_bias=False, name='input1_2')(x)
         x = layers.BatchNormalization(name='input1_2_bn')(x)
         x = layers.Activation('relu', name='input1_2_relu')(x)
@@ -308,7 +308,7 @@ def Time(features, iks, input_shape, num_classes):
     x = layers.SeparableConv2D(16, (1, t), use_bias=False, padding=pad, name='block1')(x)
     x = layers.BatchNormalization(name='block1_bn')(x)
 
-    if features in ['chroma']:
+    if features in ['chroma', 'mfcc']:
         x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block1_mp_freq')(x)
     else:
         x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block1_mp_freq')(x)
@@ -319,7 +319,7 @@ def Time(features, iks, input_shape, num_classes):
     x = layers.SeparableConv2D(32, (1, t), use_bias=False, padding=pad, name='block2')(x)
     x = layers.BatchNormalization(name='block2_bn')(x)
 
-    if features in ['chroma']:
+    if features in ['chroma', 'mfcc']:
         x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block2_mp_freq')(x)
     else:
         x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block2_mp_freq')(x)
@@ -330,7 +330,7 @@ def Time(features, iks, input_shape, num_classes):
     x = layers.SeparableConv2D(64, (1, t), use_bias=False, padding=pad, name='block3')(x)
     x = layers.BatchNormalization(name='block3_bn')(x)
 
-    if features in ['chroma']:
+    if features in ['chroma', 'mfcc']:
         x = layers.MaxPooling2D((1, 2), strides=(1, 2), padding='same', name='block3_mp_freq')(x)
     else:
         x = layers.MaxPooling2D((2, 1), strides=(2, 1), padding='same', name='block3_mp_freq')(x)
@@ -359,7 +359,7 @@ def Freq(features, iks, input_shape, num_classes):
     
     inputs = layers.Input(shape=input_shape)
 
-    if features in ['chroma']:
+    if features in ['chroma', 'mfcc']:
         s, f, pad = 1, 3, 'same'
     elif features in ['cifar100']:
         s, f, pad = 1, 9, 'same'
@@ -503,7 +503,7 @@ if __name__ == '__main__':
             fiks = [4, 5, 6, 12, 24, 48]  # 42, 33, 28, 14, 7, 3
             tiks = [4, 8, 16, 32, 64, 96] # 160, 80, 40, 20, 10, 6
 
-        elif args.features == 'chroma':
+        elif args.features in ['chroma', 'mfcc']:
             freq, time = 12, 643
             dim = (freq, time, 1)
             fiks = [1, 2, 3, 4, 6, 12]  # 12, 6, 4, 3, 2, 1
