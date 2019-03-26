@@ -126,7 +126,6 @@ Spotify/dumps/*
 Spotify/*.pickle
 /all_dumps/*
 Spotify/external_datasets/*.zip
-Spotify/external_datasets/*.csv
 Spotify/external_datasets/*.xlsx
 Spotify/external_datasets/artist_location.txt
 Spotify/external_datasets/*.pickle
