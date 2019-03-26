@@ -1,0 +1,259 @@
+genre,city,state,country,lat,lng
+bergen,Bergen,Hordaland,Norway,60.391,5.3245
+malmo,Malmö,Skåne,Sweden,55.5833,13.0333
+lund,Lund,Skåne,Sweden,55.7047,13.1910
+stockholm,Stockholm,Stockholm,Sweden,59.3508,18.0973
+gothenburg,Göteborg,Västra Götaland,Sweden,57.75,12.0
+vienna,Vienna,Wien,Austria,48.2,16.3666
+athens,Athens,Georgia,United States,33.962034,-83.367801
+rome,Rome,Lazio,Rome,41.896,12.4833
+hong kong,Hong Kong,None,Hong Kong,22.305,114.185
+singaporean,Singapore,None,Singapore,1.293,103.8558
+shibuya-kei,Tokyo,Tōkyō,Japan,35.685,139.7514
+manila,Manila,None,Philippines,14.6042,120.9822
+concepcion,Concepción,Concepción,Chile,-23.4064,-57.4344
+oaxaca,Oaxaca,Oaxaca,Mexico,17.0827,-96.6699
+tijuana,Tijuana,Baja California,Mexico,32.5,-117.08
+chihuahua,Chihuahua,Chihuahua,Mexico,28.645,-106.085
+monterrey,Monterrey,Nuevo León,Mexico,25.67,-100.33
+bollywood,Mumbai,Mahārāshtra,India,19.017,72.857
+cape town,Cape Town,Western Cape,South Africa,-33.92,18.435
+melbourne,Melbourne,Victoria,Australia,-37.82,144.975
+canberra,Canberra,Australian Capital Territory,Australia,-35.283,149.129
+sydney,Sydney,New South Wales,Australia,-33.92,151.1852
+manchester,Manchester,Manchester,United Kingdom,53.5004,-2.248
+perth,Perth,Western Australia,Australia,-31.955,115.84
+brisbane,Brisbane,Queensland,Australia,-27.455,153.0351
+aberdeen,Aberdeen,Aberdeen City,United Kingdom,57.1704,-2.08
+glasgow,Glasgow,Glasgow City,United Kingdom,55.8744,-4.2507
+edinburgh,Edinburgh,Edinburgh,United Kingdom,55.9483,-3.2191
+nottingham,Nottingham,Nottingham,United Kingdom,52.9703,-1.17
+southampton,Southampton,Southampton,United Kingdom,50.9,-1.4
+leeds,Leeds,Leeds,United Kingdom,53.83,-1.58
+liverpool,Liverpool,Liverpool,United Kingdom,53.416,-2.918
+bristol,Bristol,Bristol,United Kingdom,51.45,-2.5833
+sheffield,Sheffield,Sheffield,United Kingdom,53.3667,-1.5
+oxford,Oxford,Oxfordshire,United Kingdom,51.7704,-1.25
+brighton,Brighton,Brighton and Hove,United Kingdom,50.8303,-0.17
+canterbury,Canterbury,Canterbury,United Kingdom,51.2804,1.0789
+leicester,Leicester,Leicester,United Kingdom,52.63,-1.1332
+houston,Houston,Texas,United States,29.7871,-95.3936
+bay area,San Francisco,California,United States,37.7561,-122.4429
+nashville,Nashville,Tennessee,United States,36.1714,-86.7844
+vegas,Las Vegas,Nevada,United States,36.2288,-115.2603 
+slc,Salt Lake City,Utah,United States,40.7774,-111.9301
+charlotte nc,Charlotte,North Carolina,United States,35.208,-80.8308
+buffalo ny,Buffalo,New York,United States,42.9016,-78.8487
+lancaster pa,Lancaster,Pennsylvania,United States,40.0421,-76.3012
+cleveland,Cleveland,Ohio,United States,41.4766,-81.6805
+birmingham,Birmingham,Alabama,United States,33.5276,-86.7986 
+albuquerque,Albuquerque,New Mexico,United States,35.1055,-106.6476
+cincinnati,Cincinnati,Ohio,United States,39.1412,-84.506
+jacksonville,Jacksonville,Florida,United States,30.3322,-81.6749
+chicago,Chicago,Illinois,United States,41.8373,-87.6861
+milwaukee,Milwaukee,Wisconsin,United States,43.064,-87.9669
+baltimore,Baltimore,Maryland,United States,39.3051,-76.6144
+grand rapids,Grand Rapids,Minnesota,United States,42.9615,-85.6557
+detroit,Detroit,Michigan,United States,42.3834,-83.1024
+portland,Portland,Oregon,United States, 45.5372,-122.6500
+pittsburgh,Pittsburgh,Pennsylvania,United States,40.4396,-79.9763
+el paso,El Paso,Texas,United States,31.8478,-106.431
+lawrence ks,Lawrence,Kansas,United States,38.9603,-95.2643 
+memphis,Memphis,Tennessee,United States,35.1047,-89.9773
+gainesville,Gainesville,Florida,United States,29.6814,-82.3454
+kc,Kansas City,Missouri,United States,39.1239,-94.5541
+minneapolis,Minneapolis,Minnesota,United States,44.9635,-93.2679
+twin cities,Saint Paul,Minnesota,United States,44.9477,-93.104
+san diego,San Diego,California,United States,32.8312,-117.1225
+albany ny,Albany,New York,United States,42.6664,-73.7987
+miami,Miami,Florida,United States,25.784,-80.2102
+san antonio,San Antonio,Texas,United States,29.4722,-98.5247
+denver,Denver,Colorado,United States,39.7621,-104.8759
+dallas,Dallas,Texas,United States,32.7938,-96.7659
+new orleans,New Orleans,Louisiana,United States,30.0687,-89.9288
+stl,Saint Louis,Missouri,United States,38.6358,-90.2451
+orlando,Orlando,Florida,United States,28.4801,-81.3448
+boston,Boston,Massachusetts,United States,42.3189,-71.0838
+nc,North Carolina,United States,35.8323,-78.6441
+dc,Washington,District of Columbia,United States,38.9047,-77.0163
+louisville,Louisville,Kentucky,United States,38.1662,-85.6488
+nyc,New York,New York,United States,40.6943,-73.9249
+seattle,Seattle,Washington,United States,47.6217,-122.3238
+philly,Philadelphia,Pennsylvania,United States,40.0076,-75.134
+austindie,Austin,Texas,United States,30.3038,-97.7545
+omaha,Omaha,Nebraska,United States,41.2634,-96.0453
+nyhc,New York,New York,United States,40.6943,-73.9249
+brooklyn,Brooklyn,New York,United States,40.6501,-73.9496
+west coast,Los Angeles,California,United States,34.114,-118.4068
+atl,Atlanta,Georgia,United States,33.7627,-84.4231
+vancouver,Vancouver,British Columbia,Canada,49.2734,-123.1216
+toronto,Toronto,Ontario,Canada,43.7,-79.42
+winnipeg,Winnipeg,Manitoba,Canada,49.883,-97.166
+montreal,Montréal,Québec,Canada,45.5,-73.5833
+halifax,Halifax,Nova Scotia,Canada,44.65,-63.6
+calgary,Calgary,Alberta,Canada,51.083,-114.08
+edmonton,Edmonton,Alberta,Canada,53.55,-113.5
+victoria bc,Victoria,British Columbia,Canada,48.4333,-123.3500 
+ok,None,Oklahoma,United States,35.4677,-97.5138
+essex,None,Essex,United Kingdom,51.7333,0.4833
+devon,None,Devon,United Kingdom,50.7004,-3.53
+alabama,None,Alabama,United States,32.347,-86.2663
+alaska,None,Alaska,United States,58.4566,-134.1776
+arizona,None,Arizona,United States,33.5722,-112.0891
+arkansas,None,Arkansas,United States,34.7255,-92.3584
+california,None,California,United States,38.5666,-121.4683
+colorado,None,Colorado,United States,39.7621,-104.8759
+florida,None,Florida,United States,30.4549,-84.2527
+georgia,None,Georgia,United States,33.7627,-84.4231
+idaho,None,Idaho,United States,43.5991,-116.2306
+illinois,None,Illinois,United States,39.7713,-89.6538
+indiana,None,Indiana,United States,39.7771,-86.1458
+iowa,None,Iowa,United States,41.5725,-93.6104
+kansas,None,Kansas,United States,39.0347,-95.6955
+kentucky,None,Kentucky,United States,38.1924,-84.8644
+louisiana,None,Louisiana,United States,30.4422,-91.1314
+maryland,None,Maryland,United States,38.9705,-76.5047
+massachusetts,None,Massachusetts,United States,42.3189,-71.0838
+michigan,None,Michigan,United States,42.7142,-84.5598
+minnesota,None,Minnesota,United States,44.9477,-93.104
+mississippi,None,Mississippi,United States,32.3163,-90.2124
+missouri,None,Missouri,United States,38.5677,-92.1757
+montana,None,Montana,United States,46.5963,-112.0196
+nebraska,None,Nebraska,United States,40.8102,-96.6808
+nevada,None,Nevada,United States,39.1512,-119.7474
+new hampshire,None,New Hampshire,United States,43.2307,-71.5595
+new jersey,None,New Jersey,United States,40.2237,-74.764
+new mexico,None,New Mexico,United States,35.6619,-105.9818
+new york,None,New York,United States,42.6664,-73.7987
+north carolina,None,North Carolina,United States,35.8323,-78.6441
+north dakota,None,North Dakota,United States,46.8127,-100.7694
+ohio,None,Ohio,United States,39.9859,-82.9852
+oklahoma,None,Oklahoma,United States,35.4677,-97.5138
+oregon,None,Oregon,United States,44.9231,-123.0245
+pennsylvania,None,Pennsylvania,United States,40.2752,-76.8843
+rhode island,None,Rhode Island,United States,41.8229,-71.4186
+south carolina,None,South Carolina,United States,34.0366,-80.9043
+south dakota,None,South Dakota,United States,43.6211,-96.9431
+tennessee,None,Tennessee,United States,36.1714,-86.7844
+texas,None,Texas,United States,30.3038,-97.7545
+utah,None,Utah,United States,40.7774,-111.9301
+vermont,None,Vermont,United States,44.2658,-72.5717
+virginia,None,Virginia,United States,37.5294,-77.4755
+washington,None,Washington,United States,47.0417,-122.8958
+west virginia,None,West Virginia,United States,38.3484,-81.6323
+wisconsin,None,Wisconsin,United States,43.0809,-89.3921
+wyoming,None,Wyoming,United States,41.1418,-104.7943
+connecticut,None,Connecticut,United States,41.8349,-73.1282
+delaware,None,Delaware,United States,39.6777,-75.7573
+maine,None,Maine,United States,46.6868,-67.9874
+western mass,None,Massachusetts,United States,42.3189,-71.0838
+nl,None,Newfoundland and Labrador,Canada,47.585,-52.681
+bc,None,British Columbia,Canada,48.4333,-123.3500 
+alberta,None,Alberta,Canada,53.55,-113.5
+manitoba,None,Manitoba,Canada,49.883,-97.166
+quebec,None,Québec,Canada,45.5,-73.5833
+pei,None,Prince Edward Island,Canada,46.2493,-63.1313
+new brunswick,None,New Brunswick,Canada,45.95,-66.6333
+saskatchewan,None,Saskatchewan,Canada,52.17,-106.67
+newfoundland,None,Newfoundland and Labrador,Canada,47.585,-52.681
+quebecois,None,Québec,Canada,45.5,-73.5833
+hawaiian,None,Hawaii,United States,21.3293,-157.846
+icelandic,None,None,Iceland,64.15,-21.95
+greenlandic,None,None,Greenland,64.1983,-51.7327
+norwegian,None,None,Norway,59.9167,10.75
+finnish,None,None,Finland,60.1756,24.9341
+swedish,None,None,Sweden,59.3508,18.0973
+romanian,None,None,Romania,44.4334,26.0999
+hungarian,None,None,Hungary,47.5,19.0833
+polish,None,None,Poland,52.25,21.0
+turkish,None,None,Turkey,39.9272,32.8644
+slovenian,None,None,Slovenia,46.0553,14.515
+latvian,None,None,Latvia,56.95,24.1
+estonian,None,None,Estonia,59.4339,24.728
+bulgarian,None,None,Bulgaria,42.6833,23.3167
+czech,None,None,Czechia,50.0833,14.466
+czskm,None,None,Czechia,50.0833,14.466
+belarusian,None,None,Belarus,53.9,27.5666
+russian,None,None,Russia,55.7522,37.6155
+slovak,None,None,Slovakia,48.15,17.117
+albanian,None,None,Albania,41.3275,19.8189
+french,None,None,France,48.8667,2.3333
+german,None,None,Germany,52.5218,13.4015
+danish,None,None,Netherlands,52.35,4.9166
+dutch,None,None,Netherlands,52.35,4.9166
+flemish,None,None,Netherlands,52.35,4.9166
+belgian,None,None,Belgium,50.8333,4.3333
+luxembourgian,None,None,Luxembourg,49.6117,6.13
+austrian,None,None,Austria,48.2,16.3666
+austropop,None,None,Austria,48.2,16.3666
+swiss,None,None,Switzerland,46.9167,7.467
+portuguese,None,None,Portugal,38.7227,-9.1449
+portugues,None,None,Portugal,38.7227,-9.1449
+catalana,None,None,Spain,41.3833,2.1834
+croatian,None,None,Croatia,45.8,16.0
+greek,None,None,Greece,37.9833,23.7333
+italian,None,None,Italy,41.896,12.4833
+sardinia,None,None,Sardinia,39.2224,9.104
+italo,None,None,Italy,41.896,12.4833
+italogaze,None,None,Italy,41.896,12.4833
+chinese,None,None,China,39.9289,116.3883
+korean,None,None,South Korea,37.5663,126.9997
+k-hop,None,None,South Korea,37.5663,126.9997
+k-pop,None,None,South Korea,37.5663,126.9997
+japanese,None,None,Japan,35.685,139.7514 
+j-,None,None,Japan,35.685,139.7514
+japanoise,None,None,Japan,35.685,139.7514
+kawaii,None,None,Japan,35.685,139.7514
+malaysian,None,None,Malaysia,3.1667,101.7
+indonesian,None,None,Indonesia,-6.1744,106.8294
+pinoy,None,None,Philippines,14.6042,120.9822
+opm,None,None,Philippines,14.6042,120.9822
+brazilian,None,None,Brazil,-15.7833,-47.9161
+colombian,None,None,Colombia,4.5964,-74.0833
+colombiano,None,None,Colombia,4.5964,-74.0833
+chilean,None,None,Chile,-33.45,-70.667
+chileno,None,None,Chile,-33.45,-70.667
+peruvian,None,None,Peru,-12.048,-77.0501
+panamanian,None,None,Panama,8.968,-79.533
+venezuelan,None,None,Venezuela,10.501,-66.917
+ecuadorian,None,None,Ecuador,-0.215,-78.5001
+argentine,None,None,Argentina,-34.6025,-58.3975
+mexicana,None,None,Mexico,19.4424,-99.131
+mexican,None,None,Mexico,19.4424,-99.131
+mexico,None,None,Mexico,19.4424,-99.131
+mexicano,None,None,Mexico,19.4424,-99.131
+cuban,None,None,Cuba,23.132,-82.3642
+cubano,None,None,Cuba,23.132,-82.3642
+haitian,None,None,Haiti,18.541,-72.336
+puerto rican,None,None,Puerto Rico,18.14, -66.26
+dominicano,None,None,Dominican Republic,18.4701,-69.9001
+dominican,None,None,Dominican Republic,18.4701,-69.9001
+egyptian,None,None,Egypt,30.05,31.25
+israeli,None,None,Israel,31.7784,35.2066
+pakistani,None,None,Pakistan,33.7,73.1666
+indian,None,None,India,28.6,77.2
+lebanese,None,None,Lebanon,33.872,35.5097
+south african,None,None,South Africa,-25.7069,28.2294
+ghanaian,None,None,Ghana,5.55,-0.2167
+nigerian,None,None,Nigeria,9.0833,7.5333
+australian,None,None,Australia,-35.283,149.129
+aussietronica,None,None,Australia,-35.283,149.129
+tassie,None,None,Australia,-42.85,147.295
+maori,None,None,New Zealand,-41.3,174.7833
+aussie,None,None,Australia,-35.283,149.129
+nz,None,None,New Zealand,-41.3,174.7833
+fijian,None,None,Fiji,-18.133,178.4417
+uk,None,None,United Kingdom,51.5,-0.1167
+english,None,None,United Kingdom,51.5,-0.1167
+british,None,None,United Kingdom,51.5,-0.1167
+scottish,None,None,United Kingdom,55.9483,-3.2191
+irish,None,None,Ireland,53.3331,-6.2489
+ukhc,None,None,United Kingdom,51.5,-0.1167
+welsh,None,None,United Kingdom,51.63,-3.95
+native american,None,None,United States,44.0709,-103.22
+american,None,None,United States,44.0709,-103.22
+cajun,None,None,United States,30.0687,-89.9288
+tin pan alley,None,None,United States,40.6943,-73.9249
+east coast,None,None,United States,40.6943,-73.9249
+new england,None,None,United States,42.3189,-71.0838
+canadian,None,None,Canada,49.883,-97.166
