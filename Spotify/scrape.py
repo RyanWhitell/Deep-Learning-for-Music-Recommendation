@@ -58,6 +58,11 @@ musicbrainzngs.set_useragent('haamr', 1.0)
 client_credentials_manager = SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID, client_secret=SPOTIFY_CLIENT_SECRET)
 SPOTIFY = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
+GENRE_LOC = pd.read_csv(
+    './external_datasets/genre_places.csv',
+    index_col='genre'
+)
+
 with open('./external_datasets/external_data.pickle', 'rb') as f:
     save = pickle.load(f)
     LYRICS = save['LYRICS']
@@ -243,6 +248,7 @@ def clean_song_title(song_title):
     song_title = re.sub(re.compile(r' -.*B-Side.*', re.IGNORECASE), '', song_title)
     song_title = re.sub(re.compile(r' -.*Bonus.*', re.IGNORECASE), '', song_title)
     song_title = re.sub(re.compile(r' \(feat.*', re.IGNORECASE), '', song_title)
+    song_title = re.sub(re.compile(r' \(from.*', re.IGNORECASE), '', song_title)
     return re.sub(re.compile(r' \(.*Version.*\)', re.IGNORECASE), '', song_title)
 
 def clean_lyrics(lyrics):
@@ -391,6 +397,31 @@ def get_track_lyrics(song_title, artist_name):
     return lyrics
 
 ####### Track #######
+def get_earliest_album(artists_name, track_name, year, track_id, artist_id, album_id):
+    q='artist:' + artists_name + ' track:' + clean_song_title(track_name)
+    results = SPOTIFY.search(q=q, limit=20, type='track')
+    track = None
+    for t in results['tracks']['items']:
+        if -60 < (int(t['album']['release_date'][:4]) - year) < -10 \
+                                                                and t['artists'][0]['id'] == artist_id \
+                                                                and t['id'] != track_id \
+                                                                and t['album']['id'] != album_id \
+                                                                and int(t['album']['release_date'][:4]) > 1910:
+            year = int(t['album']['release_date'][:4])
+            if 'Live' not in t['name'] and 'Remix' not in t['name']:
+                track = t
+    if track is not None:
+        for t in results['tracks']['items']:
+            if (int(t['album']['release_date'][:4]) - year) < 0 \
+                                                                    and t['artists'][0]['id'] == artist_id \
+                                                                    and t['id'] != track_id \
+                                                                    and t['album']['id'] != album_id \
+                                                                    and int(t['album']['release_date'][:4]) > 1910:
+                year = int(t['album']['release_date'][:4])
+                if 'Live' not in t['name'] and 'Remix' not in t['name']:
+                    track = t
+    return track
+
 def compare_lyrics(lyrics_list, lyrics):
     for _, v in lyrics_list.items():
         if v == lyrics:
@@ -413,6 +444,21 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
     if country is not None and country not in ['XK', 'US']:
         res_home = SPOTIFY.artist_top_tracks(seed_artist_id, country=country)
         for track in res_home['tracks']:
+            
+            try:
+                t = get_earliest_album(
+                        artist_name, 
+                        track['name'], 
+                        int(track['album']['release_date'][:4]), 
+                        track['id'], 
+                        artist_id, 
+                        track['album']['id']
+                    )
+                if t is not None:
+                    track = t
+            except:
+                pass
+            
             if track['preview_url'] is None:
                 continue
             
@@ -428,6 +474,7 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
                 continue
 
             if lyrics is not None and compare_lyrics(lyrics_list, lyrics):
+                 
                 printlog(
                     str(track['id']) +
                     ' : ' + str(track['name'])
@@ -464,6 +511,21 @@ def fr_get_top_tracks_albums(df_tracks, df_albums, country, artist_name, artist_
                 
     res_US = SPOTIFY.artist_top_tracks(seed_artist_id, country='US')
     for track in res_US['tracks']:
+        
+        try:
+            t = get_earliest_album(
+                    artist_name, 
+                    track['name'], 
+                    int(track['album']['release_date'][:4]), 
+                    track['id'], 
+                    artist_id, 
+                    track['album']['id']
+                )
+            if t is not None:
+                track = t
+        except:
+            pass
+        
         if track['preview_url'] is None:
             continue
                 
@@ -1260,9 +1322,31 @@ if __name__=='__main__':
                 location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
 
                 if location is None:
-                    printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
-                    num_seed_artists -= 1
-                    continue
+                    location = {}
+                    found = False
+                    printlog(f'Try getting location from the genre')
+
+                    for genre in artist_metadata.genres.values[0]:
+                        for genre_word in genre.split():
+                            if genre_word in GENRE_LOC.index:
+                                location['lat'] = GENRE_LOC.loc[genre_word].values[3]
+                                location['lng'] = GENRE_LOC.loc[genre_word].values[4]
+                                try:
+                                    country = pycountry.countries.lookup(GENRE_LOC.loc[genre_word].values[2]).alpha_2
+                                except Exception: 
+                                    pass
+                                found = True
+                            if found:
+                                break
+                        if found:
+                            break
+                            
+                    if found:
+                        printlog(f'Location from genre: {genre_word}')
+                    else:
+                        printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
+                        num_seed_artists -= 1
+                        continue
 
                 artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
                 artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
@@ -1493,15 +1577,44 @@ if __name__=='__main__':
 
         ################## Get location #################################################
         try:
-            printlog(f'Getting location of artist...')
+            printlog(f'Check if location needs to be determined...') 
+            if artist_metadata.lat[0] is None or artist_metadata.lng[0] is None:
+                # {lat: 0.0, lng: 0.0}
+                printlog(f'Getting location of artist...')
 
-            location, country = get_artist_location(artist_name=artist_name)
+                location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
 
-            if location is None:
-                printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
-                continue
+                if location is None:
+                    location = {}
+                    found = False
+                    printlog(f'Try getting location from the genre')
 
-            printlog(f'Success getting location.')
+                    for genre in artist_metadata.genres.values[0]:
+                        for genre_word in genre.split():
+                            if genre_word in GENRE_LOC.index:
+                                location['lat'] = GENRE_LOC.loc[genre_word].values[3]
+                                location['lng'] = GENRE_LOC.loc[genre_word].values[4]
+                                try:
+                                    country = pycountry.countries.lookup(GENRE_LOC.loc[genre_word].values[2]).alpha_2
+                                except Exception: 
+                                    pass
+                                found = True
+                            if found:
+                                break
+                        if found:
+                            break
+                            
+                    if found:
+                        printlog(f'Location from genre: {genre_word}')
+                    else:
+                        printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
+                        num_seed_artists -= 1
+                        continue
+
+                artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
+                artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
+
+                printlog(f'Success getting location.')
 
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
