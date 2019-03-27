@@ -1332,7 +1332,7 @@ if __name__=='__main__':
                                 location['lat'] = GENRE_LOC.loc[genre_word].values[3]
                                 location['lng'] = GENRE_LOC.loc[genre_word].values[4]
                                 try:
-                                    country = pycountry.countries.lookup(GENRE_LOC.loc[genre_word].values[2]).alpha_2
+                                    _, country = get_location_from_coord(location['lat'], location['lng'])
                                 except Exception: 
                                     pass
                                 found = True
@@ -1355,6 +1355,9 @@ if __name__=='__main__':
 
             else:
                 location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
+
+            if len(country) != 2:
+                country = None
 
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
@@ -1595,7 +1598,7 @@ if __name__=='__main__':
                                 location['lat'] = GENRE_LOC.loc[genre_word].values[3]
                                 location['lng'] = GENRE_LOC.loc[genre_word].values[4]
                                 try:
-                                    country = pycountry.countries.lookup(GENRE_LOC.loc[genre_word].values[2]).alpha_2
+                                    _, country = get_location_from_coord(location['lat'], location['lng'])
                                 except Exception: 
                                     pass
                                 found = True
@@ -1616,11 +1619,17 @@ if __name__=='__main__':
 
                 printlog(f'Success getting location.')
 
+            else:
+                location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
+
+            if len(country) != 2:
+                country = None
+
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
             backup_dataframes()
             break
-
+    
         ################## Get seed artist ID and metadata ##########################################
         try:
             # id: '', name: '', genres: [], lat: 0.0, lng: 0.0
