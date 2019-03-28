@@ -24,7 +24,7 @@ import FMA
 
 parser = argparse.ArgumentParser(description="gets testing results from a model")
 parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
-parser.add_argument('-f', '--features', default='', help='features to use: stft, stft_halved, mel_scaled_stft')
+parser.add_argument('-f', '--features', default='', help='features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 args = parser.parse_args()
 
 class DataGenerator(keras.utils.Sequence):
@@ -81,7 +81,7 @@ class DataGenerator(keras.utils.Sequence):
 def test_model(model_name, dim, features, dataset):
     K.clear_session()
     
-    model_path = './Models/' + dataset + '.' + features + '.' + model_name + '.hdf5'
+    model_path = './Models/cnn/' + dataset + '.' + features + '.' + model_name + '.hdf5'
 
     model = load_model(model_path)
 
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     epochs = []
 
     for index, row in results.iterrows():
-        hist_path = './Models/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
+        hist_path = './Models/cnn/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
         
         hist=pickle.load(open(hist_path, "rb" ))
         hist_acc.append(hist['acc'])
@@ -219,6 +219,6 @@ if __name__ == '__main__':
 
     results['epochs'] = epochs
 
-    save_path = './Results/' + args.dataset + '.' + args.features  + '.pkl'
+    save_path = './Results/cnn/' + args.dataset + '.' + args.features  + '.pkl'
 
     results.to_pickle(save_path)
