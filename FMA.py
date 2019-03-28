@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import ast
 import numpy as np
+from sklearn.preprocessing import MultiLabelBinarizer
 
 class FreeMusicArchive:
     def __init__(self, fma_set, sr=44100):
@@ -35,10 +36,11 @@ class FreeMusicArchive:
         self.FILES_FAULTY = self.FILES_NO_AUDIO + self.FILES_SHORT + self.FILES_DISTORTED + self.FILES_CORRUPT
 
         self.TRACKS, self.PARTITION = self.get_metadata(fma_set)
-
-        self.TOP_GENRES, self.CLASS_MAP, self.NUM_CLASSES = self.get_top_genres(fma_set)
-
+        
         self.FEATURES = self.load(self.META_FEATURES_PATH)
+        self.GENRES = self.load(self.META_GENRES_PATH)
+
+        self.ALL_GENRES, self.TOP_GENRES, self.CLASS_MAP, self.NUM_CLASSES = self.get_labels(fma_set)
 
     def load(self, filepath):
         filename = os.path.basename(filepath)
@@ -102,14 +104,14 @@ class FreeMusicArchive:
             partition['test'] = ss.loc[ss.set.split == 'test'].index.values
             return ss, partition
 
-    def get_top_genres(self, fma_set):
+    def get_labels(self, fma_set):
         if fma_set == 'small':
             class_map = {'Electronic':0, 'Experimental':1, 'Folk':2, 'Hip-Hop':3, 'Instrumental':4, 'International':5, 'Pop':6, 'Rock':7}
             labels = {}
             for index, row in self.TRACKS.track.iterrows():
                 labels[index] = class_map[row['genre_top']]
 
-            return labels, class_map, len(class_map)
+            return None, labels, class_map, len(class_map)
 
         elif fma_set == 'medium':
             labels = {}
@@ -122,10 +124,23 @@ class FreeMusicArchive:
             for index, row in self.TRACKS.track.iterrows():
                 labels[index] = class_map[row['genre_top']]
 
-            return labels, class_map, len(class_map)
+            return None, labels, class_map, len(class_map)
+
+        elif fma_set in ['large', 'full']:
+            mlb = MultiLabelBinarizer()
+            mlb.fit(self.TRACKS.track.genres_all)
+            labels = {}
+            class_map = {}
+            for index, track in self.TRACKS.track.iterrows():
+                labels[index] = mlb.transform([tuple(track.genres_all)])[0]
+            
+            for index in mlb.classes_:
+                class_map[self.GENRES.loc[index].title] = index
+
+            return labels, None, class_map, len(class_map)
 
         else:
-            return None, None, None
+            return None, None, None, None
 
     def get_filenames(self, filepath):
         names = os.listdir(filepath)
