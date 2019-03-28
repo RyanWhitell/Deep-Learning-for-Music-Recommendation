@@ -83,9 +83,9 @@ class DataGenerator(keras.utils.Sequence):
 def train_model(model, model_name, dim, features, dataset, quick):
     try:
         if quick:
-            model_name = './Models/' + 'DELETE.' + dataset + '.' + features + '.' + model_name
+            model_name = './Models/cnn/' + 'DELETE.' + dataset + '.' + features + '.' + model_name
         else:
-            model_name = './Models/' + dataset + '.' + features + '.' + model_name
+            model_name = './Models/cnn/' + dataset + '.' + features + '.' + model_name
 
         print('*' * 117)
         print(f'Training model: {model_name}')
@@ -436,11 +436,11 @@ def Freq(features, iks, input_shape, num_classes):
   
 def TimeFreq(features, dataset, input_shape,  num_classes, quick):
     if quick:
-        time_path = './Models/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
-        freq_path = './Models/' + 'DELETE.' + dataset + '.' + features + '.' + 'Freq.hdf5'
+        time_path = './Models/cnn/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
+        freq_path = './Models/cnn/' + 'DELETE.' + dataset + '.' + features + '.' + 'Freq.hdf5'
     else:
-        time_path = './Models/' + dataset + '.' + features + '.' + 'Time.hdf5'
-        freq_path = './Models/' + dataset + '.' + features + '.' + 'Freq.hdf5'
+        time_path = './Models/cnn/' + dataset + '.' + features + '.' + 'Time.hdf5'
+        freq_path = './Models/cnn/' + dataset + '.' + features + '.' + 'Freq.hdf5'
 
     time_model = load_model(time_path)
     freq_model = load_model(freq_path)
