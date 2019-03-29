@@ -109,6 +109,7 @@ Data/fma_large/*
 Data/fma_metadata/*
 Data/gtzan/*
 Data/sounds/*
+Data/Spotify/*
 
 # trained models
 Models/*
