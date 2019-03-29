@@ -17,8 +17,8 @@ import argparse
 import FMA
 
 parser = argparse.ArgumentParser(description="trains a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
-parser.add_argument('-t', '--test', default='', help='test to carry out: sgc')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large, cifar100')
+parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc)')
 parser.add_argument('-f', '--features', default='', help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
@@ -27,11 +27,12 @@ args = parser.parse_args()
 Valid test combinations:
 cifar100
 fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
+fma_large -> mgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 """
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
-    def __init__(self, list_IDs, labels, batch_size, dim, n_classes, features, dataset, n_channels=1, shuffle=True):
+    def __init__(self, list_IDs, labels, batch_size, dim, n_classes, features, dataset, test_type, n_channels=1, shuffle=True):
         'Initialization'
         self.list_IDs = list_IDs
         self.labels = labels
@@ -41,6 +42,7 @@ class DataGenerator(keras.utils.Sequence):
         self.features = features
         self.dataset = dataset
         self.data_path = './Data/features/' + dataset + '_' + features + '.hdf5'
+        self.test_type = test_type
         self.n_channels = n_channels
         self.shuffle = shuffle
         self.on_epoch_end()
@@ -77,15 +79,20 @@ class DataGenerator(keras.utils.Sequence):
             for i, ID in enumerate(list_IDs_temp):
                 X[i,] = f['data'][str(ID)]
                 y[i] = self.labels[ID]
-            
-        return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)
+        
+        if self.test_type == 'sgc':
+            return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)
+        elif self.test_type == 'mgc':
+            return X.reshape(X.shape[0], *self.dim, 1), y
+        else:
+            raise Exception('Unknown test type!')
 
-def train_model(model, model_name, dim, features, dataset, quick):
+def train_model(model, model_name, dim, features, dataset, test_type, quick):
     try:
         if quick:
-            model_name = './Models/cnn/' + 'DELETE.' + dataset + '.' + features + '.' + model_name
+            model_name = './Models/cnn/' + test_type + '/' + 'DELETE.' + dataset + '.' + features + '.' + model_name
         else:
-            model_name = './Models/cnn/' + dataset + '.' + features + '.' + model_name
+            model_name = './Models/cnn/' + test_type + '/' + dataset + '.' + features + '.' + model_name
 
         print('*' * 117)
         print(f'Training model: {model_name}')
@@ -93,20 +100,34 @@ def train_model(model, model_name, dim, features, dataset, quick):
 
         time_start = tm.perf_counter()
 
-        if dataset == 'fma_med':
+        if dataset in ['fma_med', 'fma_large']:
             train_list = FMA.PARTITION['training']
             val_list = FMA.PARTITION['validation']
-            labels = FMA.TOP_GENRES
+
+            if dataset == 'fma_med':
+                labels = FMA.TOP_GENRES
+            else:
+                labels = FMA.ALL_GENRES
+            
             num_classes = FMA.NUM_CLASSES
 
-            model.compile(
-                loss=keras.losses.categorical_crossentropy,
-                optimizer=keras.optimizers.Adam(),
-                metrics=['acc']
-            )
+            if test_type == 'sgc':
+                model.compile(
+                    loss=keras.losses.categorical_crossentropy,
+                    optimizer=keras.optimizers.Adam(),
+                    metrics=['categorical_accuracy']
+                )
+            elif test_type == 'mgc':
+                model.compile(
+                    loss=keras.losses.binary_crossentropy,
+                    optimizer=keras.optimizers.Adam(),
+                    metrics=['categorical_accuracy']
+                )
+            else:
+                raise Exception('Unknown test type!')
 
-            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
-            early_stop = EarlyStopping(monitor='val_acc', patience=20, mode='max') 
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
+            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
             callbacks_list = [checkpoint, early_stop]
 
             if quick:
@@ -115,7 +136,7 @@ def train_model(model, model_name, dim, features, dataset, quick):
                 val_list = train_list[:64]
             else:
                 epochs = 500
-
+    
             training_generator = DataGenerator(
                 list_IDs=train_list,
                 labels=labels,
@@ -123,7 +144,8 @@ def train_model(model, model_name, dim, features, dataset, quick):
                 dim=(dim[0], dim[1]),
                 n_classes=num_classes,
                 features=features,
-                dataset=dataset
+                dataset=dataset,
+                test_type=test_type
             )
 
             vbs = 1
@@ -139,6 +161,7 @@ def train_model(model, model_name, dim, features, dataset, quick):
                 n_classes=num_classes,
                 features=features,
                 dataset=dataset,
+                test_type=test_type,
                 shuffle=False
             )
 
@@ -159,8 +182,8 @@ def train_model(model, model_name, dim, features, dataset, quick):
                 metrics=['acc']
             )
 
-            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
-            early_stop = EarlyStopping(monitor='val_acc', patience=20, mode='max') 
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
+            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
             callbacks_list = [checkpoint, early_stop]
 
             if quick:
@@ -193,7 +216,7 @@ def train_model(model, model_name, dim, features, dataset, quick):
         print(e)
         print('!' * 117)
 
-def Simple(features, input_shape, num_classes):
+def Simple(features, test_type, input_shape, num_classes):
     inputs = layers.Input(shape=input_shape)
 
     if features in ['chroma', 'mfcc', 'cifar100']:
@@ -263,11 +286,16 @@ def Simple(features, input_shape, num_classes):
 
     x = layers.Dense(num_classes, name='logits')(x)
     
-    pred = layers.Activation('softmax', name='softmax')(x)
+    if test_type == 'sgc':
+        output_activation = 'softmax'
+    elif test_type == 'mgc':
+        output_activation = 'sigmoid'
+
+    pred = layers.Activation(output_activation, name=output_activation)(x)
 
     return Model(inputs=inputs, outputs=pred)
 
-def Time(features, iks, input_shape, num_classes):
+def Time(features, test_type, iks, input_shape, num_classes):
     time = input_shape[1]
 
     inputs = layers.Input(shape=input_shape)
@@ -350,11 +378,16 @@ def Time(features, iks, input_shape, num_classes):
 
     x = layers.Dense(num_classes, name='logits')(x)
     
-    pred = layers.Activation('softmax', name='softmax')(x)
+    if test_type == 'sgc':
+        output_activation = 'softmax'
+    elif test_type == 'mgc':
+        output_activation = 'sigmoid'
+
+    pred = layers.Activation(output_activation, name=output_activation)(x)
 
     return Model(inputs=inputs, outputs=pred)
 
-def Freq(features, iks, input_shape, num_classes):
+def Freq(features, test_type, iks, input_shape, num_classes):
     freq = input_shape[0]
     
     inputs = layers.Input(shape=input_shape)
@@ -430,17 +463,22 @@ def Freq(features, iks, input_shape, num_classes):
 
     x = layers.Dense(num_classes, name='logits')(x)
     
-    pred = layers.Activation('softmax', name='softmax')(x)
+    if test_type == 'sgc':
+        output_activation = 'softmax'
+    elif test_type == 'mgc':
+        output_activation = 'sigmoid'
+
+    pred = layers.Activation(output_activation, name=output_activation)(x)
 
     return Model(inputs=inputs, outputs=pred)
   
-def TimeFreq(features, dataset, input_shape,  num_classes, quick):
+def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
     if quick:
-        time_path = './Models/cnn/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
-        freq_path = './Models/cnn/' + 'DELETE.' + dataset + '.' + features + '.' + 'Freq.hdf5'
+        time_path = './Models/cnn/' + test_type + '/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
+        freq_path = './Models/cnn/' + test_type + '/' + 'DELETE.' + dataset + '.' + features + '.' + 'Freq.hdf5'
     else:
-        time_path = './Models/cnn/' + dataset + '.' + features + '.' + 'Time.hdf5'
-        freq_path = './Models/cnn/' + dataset + '.' + features + '.' + 'Freq.hdf5'
+        time_path = './Models/cnn/' + test_type + '/' + dataset + '.' + features + '.' + 'Time.hdf5'
+        freq_path = './Models/cnn/' + test_type + '/' + dataset + '.' + features + '.' + 'Freq.hdf5'
 
     time_model = load_model(time_path)
     freq_model = load_model(freq_path)
@@ -470,14 +508,22 @@ def TimeFreq(features, dataset, input_shape,  num_classes, quick):
     
     x = layers.Dense(num_classes, name='logits')(x)
     
-    pred = layers.Activation('softmax', name='softmax')(x)
+    if test_type == 'sgc':
+        output_activation = 'softmax'
+    elif test_type == 'mgc':
+        output_activation = 'sigmoid'
+
+    pred = layers.Activation(output_activation, name=output_activation)(x)
     
     return Model(inputs=inputs, outputs=pred)
 
 
 if __name__ == '__main__':
-    if args.dataset == 'fma_med':
-        FMA = FMA.FreeMusicArchive('medium', 22050)
+    if args.dataset in ['fma_med', 'fma_large']:
+        if args.dataset == 'fma_med':
+            FMA = FMA.FreeMusicArchive('medium', 22050)
+        elif args.dataset == 'fma_large':
+            FMA = FMA.FreeMusicArchive('large', 22050)
         num_classes = FMA.NUM_CLASSES
         if args.features == 'stft':
             freq, time = 2049, 643  
@@ -525,24 +571,24 @@ if __name__ == '__main__':
 
     ################# Freq ################
     K.clear_session()
-    model = Freq(features=args.features, iks=fiks, input_shape=dim, num_classes=num_classes)
+    model = Freq(features=args.features, test_type=args.test, iks=fiks, input_shape=dim, num_classes=num_classes)
     model.summary()
-    train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick) 
+    train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick) 
 
     ################ Time ################
     K.clear_session()
-    model = Time(features=args.features, iks=tiks, input_shape=dim, num_classes=num_classes)
+    model = Time(features=args.features, test_type=args.test, iks=tiks, input_shape=dim, num_classes=num_classes)
     model.summary()
-    train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)  
+    train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
 
     ################ Simple ################
     K.clear_session()
-    model = Simple(features=args.features, input_shape=dim, num_classes=num_classes)
+    model = Simple(features=args.features, test_type=args.test, input_shape=dim, num_classes=num_classes)
     model.summary()
-    train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)  
+    train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
 
     ################ TimeFreq ################
     K.clear_session()
-    model = TimeFreq(features=args.features, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
+    model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
     model.summary()
-    train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, quick=args.quick)       
+    train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       
