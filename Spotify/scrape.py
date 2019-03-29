@@ -1052,7 +1052,7 @@ def get_artist_location(artist_name):
             elif born is not None and len(born) >= 5:
                 location, country = check_world_city_data(b=born)
                     
-            if location is None or country is None:
+            if location is None:
                 raise Exception('Location could not be found in world city data')
             else:
                 return location, country
@@ -1067,7 +1067,7 @@ def get_artist_location(artist_name):
                     else:
                         raise Exception('Not enough info for world city data')
                 
-                    if location is None or country is None:
+                    if location is None:
                         raise Exception('Location could not be found in world city data')
                     else:
                         return location, country
@@ -1092,7 +1092,7 @@ def get_artist_location(artist_name):
                         elif born is not None and len(born) >= 5:
                             location, country = get_lat_long(born)
 
-                        if location is None or country is None:
+                        if location is None:
                             raise Exception('Location could not be found in world city data')
                         else:
                             return location, country
@@ -1108,7 +1108,7 @@ def get_artist_location(artist_name):
                         elif born is not None and len(born) >= 5:
                             location, country = check_world_city_data(b=born)
                 
-                        if location is None or country is None:
+                        if location is None:
                             
                             if origin is not None and len(origin) >= 5:
                                 location, country = get_lat_long(origin)
@@ -1116,7 +1116,7 @@ def get_artist_location(artist_name):
                             elif born is not None and len(born) >= 5:
                                 location, country = get_lat_long(born)
 
-                            if location is None or country is None:
+                            if location is None:
                                 raise Exception('Location could not be found in world city data')
                             else:
                                 return location, country
@@ -1356,8 +1356,10 @@ if __name__=='__main__':
             else:
                 location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
 
-            if len(country) != 2:
-                country = None
+            if country is None:
+                country = 'US'
+            elif len(country) != 2:
+                country = 'US'
 
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
@@ -1622,8 +1624,10 @@ if __name__=='__main__':
             else:
                 location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
 
-            if len(country) != 2:
-                country = None
+            if country is None:
+                country = 'US'
+            elif len(country) != 2:
+                country = 'US'
 
         except Exception:
             printlog(f'Exception occured getting location!', e=True)
