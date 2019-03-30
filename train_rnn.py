@@ -71,19 +71,24 @@ class DataGenerator(keras.utils.Sequence):
     def __data_generation(self, list_IDs_temp):
         'Generates data containing batch_size samples' 
         X = np.empty((self.batch_size, self.dim[1], self.dim[0]))
-        y = np.empty((self.batch_size), dtype=int)
+
+        if self.test_type == 'sgc':
+            y = np.empty((self.batch_size), dtype=int)
+        if self.test_type == 'mgc':
+            y = np.empty((self.batch_size, self.n_classes), dtype=int)
 
         with h5py.File(self.data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
                 X[i,] = f['data'][str(ID)]
-                y[i] = self.labels[ID]
+                if self.test_type == 'sgc':
+                    y[i] = self.labels[ID]
+                if self.test_type == 'mgc':
+                    y[i,:] = self.labels[ID]
             
         if self.test_type == 'sgc':
             return X.reshape(X.shape[0], *self.dim), keras.utils.to_categorical(y, num_classes=self.n_classes)
         elif self.test_type == 'mgc':
             return X.reshape(X.shape[0], *self.dim), y
-        else:
-            raise Exception('Unknown test type!')
 
 def train_model(model, model_name, dim, features, dataset, test_type, quick):
     try:
@@ -98,7 +103,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
 
         time_start = tm.perf_counter()
 
-        if dataset == 'fma_med':
+        if dataset in ['fma_med', 'fma_large']:
             train_list = FMA.PARTITION['training']
             val_list = FMA.PARTITION['validation']
             

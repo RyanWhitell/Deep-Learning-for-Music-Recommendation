@@ -23,13 +23,14 @@ warnings.filterwarnings("ignore")
 import FMA
 
 parser = argparse.ArgumentParser(description="gets testing results from a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large, cifar100')
+parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc)')
 parser.add_argument('-f', '--features', default='', help='features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 args = parser.parse_args()
 
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
-    def __init__(self, list_IDs, labels, batch_size, dim, n_classes, features, dataset, n_channels=1, shuffle=True):
+    def __init__(self, list_IDs, labels, batch_size, dim, n_classes, features, dataset, test_type, n_channels=1, shuffle=True):
         'Initialization'
         self.list_IDs = list_IDs
         self.labels = labels
@@ -39,6 +40,7 @@ class DataGenerator(keras.utils.Sequence):
         self.features = features
         self.dataset = dataset
         self.data_path = './Data/features/' + dataset + '_' + features + '.hdf5'
+        self.test_type = test_type
         self.n_channels = n_channels
         self.shuffle = shuffle
         self.on_epoch_end()
@@ -71,17 +73,22 @@ class DataGenerator(keras.utils.Sequence):
         X = np.empty((self.batch_size, *self.dim))
         y = np.empty((self.batch_size), dtype=int)
 
-        with h5py.File(self.data_path) as f:
+        with h5py.File(self.data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
                 X[i,] = f['data'][str(ID)]
                 y[i] = self.labels[ID]
-            
-        return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)
+        
+        if self.test_type == 'sgc':
+            return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)
+        elif self.test_type == 'mgc':
+            return X.reshape(X.shape[0], *self.dim, 1), y
+        else:
+            raise Exception('Unknown test type!')
 
-def test_model(model_name, dim, features, dataset):
+def test_model_sgc(model_name, dim, features, dataset):
     K.clear_session()
     
-    model_path = './Models/cnn/' + dataset + '.' + features + '.' + model_name + '.hdf5'
+    model_path = './Models/cnn/sgc/' + dataset + '.' + features + '.' + model_name + '.hdf5'
 
     model = load_model(model_path)
 
@@ -103,6 +110,7 @@ def test_model(model_name, dim, features, dataset):
             n_classes=num_classes,
             features=features,
             dataset=dataset,
+            test_type='sgc',
             shuffle=False
         )
 
@@ -194,14 +202,16 @@ if __name__ == '__main__':
     epochs = []
 
     for index, row in results.iterrows():
-        hist_path = './Models/cnn/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
+        hist_path = './Models/cnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
         
         hist=pickle.load(open(hist_path, "rb" ))
         hist_acc.append(hist['acc'])
         hist_val_acc.append(hist['val_acc'])
         epochs.append(len(hist['acc']))
         
-        sm, acc, macro, micro, weighted = test_model(model_name=row['name'], dim=dim, features=args.features, dataset=args.dataset)
+        function = {'sgc':test_model_sgc}
+
+        sm, acc, macro, micro, weighted = function[args.test](model_name=row['name'], dim=dim, features=args.features, dataset=args.dataset)
         accuracy.append(acc) 
         f1_macro.append(macro) 
         f1_micro.append(micro) 
@@ -219,6 +229,6 @@ if __name__ == '__main__':
 
     results['epochs'] = epochs
 
-    save_path = './Results/cnn/' + args.dataset + '.' + args.features  + '.pkl'
+    save_path = './Results/cnn/sgc' + args.dataset + '.' + args.features  + '.pkl'
 
     results.to_pickle(save_path)
