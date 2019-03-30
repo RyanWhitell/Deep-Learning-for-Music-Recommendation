@@ -188,7 +188,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
             )
 
             checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
-            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
+            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=10, mode='max') 
             callbacks_list = [checkpoint, early_stop]
 
             if quick:
