@@ -1566,6 +1566,16 @@ if __name__=='__main__':
             continue
 
         ################## Get data starting with LYRICS ################################
+        seed_artist_id = None
+        related_artists = None
+        artist_metadata = None
+        country = None
+        tracks = None
+        albums = None
+        lyrics = None
+        previews = None
+        album_covers = None
+        
         ################## Get next seed artist #########################################
         try:
             printlog('Getting next artist from LYRICS data...')
@@ -1578,62 +1588,8 @@ if __name__=='__main__':
         except Exception:
             printlog('Exception occured getting next artist!', e=True)
             backup_dataframes()
-            break
+            break   
 
-        ################## Get location #################################################
-        try:
-            printlog(f'Check if location needs to be determined...') 
-            if artist_metadata.lat[0] is None or artist_metadata.lng[0] is None:
-                # {lat: 0.0, lng: 0.0}
-                printlog(f'Getting location of artist...')
-
-                location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
-
-                if location is None:
-                    location = {}
-                    found = False
-                    printlog(f'Try getting location from the genre')
-
-                    for genre in artist_metadata.genres.values[0]:
-                        for genre_word in genre.split():
-                            if genre_word in GENRE_LOC.index:
-                                location['lat'] = GENRE_LOC.loc[genre_word].values[3]
-                                location['lng'] = GENRE_LOC.loc[genre_word].values[4]
-                                try:
-                                    _, country = get_location_from_coord(location['lat'], location['lng'])
-                                except Exception: 
-                                    pass
-                                found = True
-                            if found:
-                                break
-                        if found:
-                            break
-                            
-                    if found:
-                        printlog(f'Location from genre: {genre_word}')
-                    else:
-                        printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
-                        num_seed_artists -= 1
-                        continue
-
-                artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
-                artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
-
-                printlog(f'Success getting location.')
-
-            else:
-                location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
-
-            if country is None:
-                country = 'US'
-            elif len(country) != 2:
-                country = 'US'
-
-        except Exception:
-            printlog(f'Exception occured getting location!', e=True)
-            backup_dataframes()
-            break
-    
         ################## Get seed artist ID and metadata ##########################################
         try:
             # id: '', name: '', genres: [], lat: 0.0, lng: 0.0
@@ -1646,9 +1602,6 @@ if __name__=='__main__':
                 if results['artists']['items'][0]['name'].lower() == artist_name:
                     seed_artist_id = results['artists']['items'][0]['id']
                     artist_metadata = fr_get_artist_metadata(res=results['artists']['items'][0])
-                    
-                    artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
-                    artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
                 else:
                     printlog(f'Artist not could not be found! Bummer, cant use this artist. Try next seed artist...')
                     continue
@@ -1661,7 +1614,7 @@ if __name__=='__main__':
         except Exception:
             printlog('Exception occured getting artist ID!', e=True)
             backup_dataframes()
-            break     
+            break  
 
         ################## Get related artists ##########################################
         try:
@@ -1744,6 +1697,61 @@ if __name__=='__main__':
             backup_dataframes()
             break
 
+
+        ################## Get location #################################################
+        try:
+            printlog(f'Check if location needs to be determined...') 
+            if artist_metadata.lat[0] is None or artist_metadata.lng[0] is None:
+                # {lat: 0.0, lng: 0.0}
+                printlog(f'Getting location of artist...')
+
+                location, country = get_artist_location(artist_metadata.loc[seed_artist_id]['name'])
+
+                if location is None:
+                    location = {}
+                    found = False
+                    printlog(f'Try getting location from the genre')
+
+                    for genre in artist_metadata.genres.values[0]:
+                        for genre_word in genre.split():
+                            if genre_word in GENRE_LOC.index:
+                                location['lat'] = GENRE_LOC.loc[genre_word].values[3]
+                                location['lng'] = GENRE_LOC.loc[genre_word].values[4]
+                                try:
+                                    _, country = get_location_from_coord(location['lat'], location['lng'])
+                                except Exception: 
+                                    pass
+                                found = True
+                            if found:
+                                break
+                        if found:
+                            break
+                            
+                    if found:
+                        printlog(f'Location from genre: {genre_word}')
+                    else:
+                        printlog(f'Location could not be found! Bummer, cant use this artist. Try next seed artist...')
+                        num_seed_artists -= 1
+                        continue
+
+                artist_metadata.loc[seed_artist_id]['lat'] = location['lat']
+                artist_metadata.loc[seed_artist_id]['lng'] = location['lng']
+
+                printlog(f'Success getting location.')
+
+            else:
+                location, country = get_location_from_coord(artist_metadata.lat[0], artist_metadata.lng[0])
+
+            if country is None:
+                country = 'US'
+            elif len(country) != 2:
+                country = 'US'
+
+        except Exception:
+            printlog(f'Exception occured getting location!', e=True)
+            backup_dataframes()
+            break
+    
         ################## Get top tracks and albums ####################################
         try:
             # id: {artist_id: '', album_id: '', name: ''}
