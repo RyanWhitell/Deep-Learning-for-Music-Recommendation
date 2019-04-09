@@ -120,18 +120,20 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                     optimizer=keras.optimizers.Adam(),
                     metrics=['categorical_accuracy']
                 )
+                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
+                early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
+                callbacks_list = [checkpoint, early_stop]
             elif test_type == 'mgc':
                 model.compile(
                     loss=keras.losses.binary_crossentropy,
                     optimizer=keras.optimizers.Adam(),
-                    metrics=['categorical_accuracy']
+                    metrics=['categorical_accuracy', 'binary_accuracy', 'mean_squared_error']
                 )
+                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+                early_stop = EarlyStopping(monitor='val_loss', patience=10, mode='min') 
+                callbacks_list = [checkpoint, early_stop]
             else:
                 raise Exception('Unknown test type!')
-
-            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
-            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=10, mode='max') 
-            callbacks_list = [checkpoint, early_stop]
 
             if quick:
                 epochs = 1

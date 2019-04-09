@@ -142,21 +142,23 @@ def train_model(model, model_name, dataset, test_type, quick):
             if test_type == 'sgc':
                 model.compile(
                     loss=keras.losses.categorical_crossentropy,
-                    optimizer=keras.optimizers.Adam(lr=0.0001),
+                    optimizer=keras.optimizers.Adam(),
                     metrics=['categorical_accuracy']
                 )
+                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
+                early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
+                callbacks_list = [checkpoint, early_stop]
             elif test_type == 'mgc':
                 model.compile(
                     loss=keras.losses.binary_crossentropy,
-                    optimizer=keras.optimizers.Adam(lr=0.0001),
-                    metrics=['categorical_accuracy']
+                    optimizer=keras.optimizers.Adam(),
+                    metrics=['categorical_accuracy', 'binary_accuracy', 'mean_squared_error']
                 )
+                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+                early_stop = EarlyStopping(monitor='val_loss', patience=10, mode='min') 
+                callbacks_list = [checkpoint, early_stop]
             else:
                 raise Exception('Unknown test type!')
-
-            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
-            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=10, mode='max') 
-            callbacks_list = [checkpoint, early_stop]
 
             if quick:
                 epochs = 1
@@ -251,7 +253,7 @@ def ENS(dataset, test_type, num_classes, quick):
     cqt_freq_model   = Model(inputs=cqt_freq_model.input, outputs=cqt_freq_model.get_layer('logits').output)
     chroma_rnn_model = Model(inputs=chroma_rnn_model.input, outputs=chroma_rnn_model.get_layer('logits').output)
     mfcc_rnn_model   = Model(inputs=mfcc_rnn_model.input, outputs=mfcc_rnn_model.get_layer('logits').output)
-    
+
     for layer in stft_time_model.layers:
         layer.trainable = False
     for layer in mel_time_model.layers:
@@ -288,6 +290,11 @@ def ENS(dataset, test_type, num_classes, quick):
     
     x = layers.concatenate([stft_t, mel_t, cqt_t, stft_f, mel_f, cqt_f, chroma, mfcc], name='All_Model_Logits')
     
+    if test_type == 'mgc':
+        x = layers.Dense(2048, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_0')(x)
+        x = layers.Activation('relu', name='fc_0_relu')(x)
+        x = layers.Dropout(0.5, name='fc_0_dropout')(x)
+
     x = layers.Dense(1024, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
     x = layers.Activation('relu', name='fc_1_relu')(x)
     x = layers.Dropout(0.5, name='fc_1_dropout')(x)
@@ -310,6 +317,7 @@ def ENS(dataset, test_type, num_classes, quick):
     pred = layers.Activation(output_activation, name=output_activation)(x)
     
     return Model(inputs=[X_stft, X_mel, X_cqt, X_chroma, X_mfcc], outputs=pred)
+
 
 if __name__ == '__main__':
     if args.dataset in ['fma_med', 'fma_large']:
