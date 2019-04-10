@@ -71,19 +71,24 @@ class DataGenerator(keras.utils.Sequence):
     def __data_generation(self, list_IDs_temp):
         'Generates data containing batch_size samples' 
         X = np.empty((self.batch_size, *self.dim))
-        y = np.empty((self.batch_size), dtype=int)
+        
+        if self.test_type == 'sgc':
+            y = np.empty((self.batch_size), dtype=int)
+        if self.test_type == 'mgc':
+            y = np.empty((self.batch_size, self.n_classes), dtype=int)
 
         with h5py.File(self.data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
                 X[i,] = f['data'][str(ID)]
-                y[i] = self.labels[ID]
+                if self.test_type == 'sgc':
+                    y[i] = self.labels[ID]
+                if self.test_type == 'mgc':
+                    y[i,:] = self.labels[ID]
         
         if self.test_type == 'sgc':
             return X.reshape(X.shape[0], *self.dim, 1), keras.utils.to_categorical(y, num_classes=self.n_classes)
         elif self.test_type == 'mgc':
             return X.reshape(X.shape[0], *self.dim, 1), y
-        else:
-            raise Exception('Unknown test type!')
 
 def test_model_sgc(model_name, dim, features, dataset):
     K.clear_session()
@@ -141,17 +146,51 @@ def test_model_sgc(model_name, dim, features, dataset):
     
     return softmax_out, acc, f1_macro, f1_micro, f1_weighted
 
+def test_model_mgc(model_name, dim, features, dataset):
+    K.clear_session()
+    
+    model_path = './Models/cnn/mgc/' + dataset + '.' + features + '.' + model_name + '.hdf5'
+
+    model = load_model(model_path)
+
+    if dataset == 'fma_large':
+        test_list = FMA.PARTITION['test']
+        labels = FMA.ALL_GENRES
+        num_classes = FMA.NUM_CLASSES
+
+        tbs = 1
+        for i in range(1,17):
+            if len(test_list) % i == 0:
+                tbs = i
+        
+        test_generator = DataGenerator(
+            list_IDs=test_list,
+            labels=labels,
+            batch_size=tbs,
+            dim=dim,
+            n_classes=num_classes,
+            features=features,
+            dataset=dataset,
+            test_type='mgc',
+            shuffle=False
+        )
+
+        sigmoid_out = model.predict_generator(
+            generator=test_generator,
+            verbose=1
+        )
+
+    predicted = np.asarray(np.around(sigmoid_out), dtype=np.int)
+
+    hamm = metrics.hamming_loss(y_true, predicted)
+    mse = np.mean((y_true - sigmoid_out)**2)
+
+    print(f'{model_path}\nhamm {hamm:.6f} mse {mse:.6f}')
+    
+    return sigmoid_out, hamm, mse
+
 if __name__ == '__main__':
-    if args.dataset == 'fma_med':
-        FMA = FMA.FreeMusicArchive('medium', 22050)
-
-        y_true = []
-        for i in FMA.PARTITION['test']:
-            y_true.append(FMA.TOP_GENRES[i])
-
-        y_true = np.array(y_true)    
-        y_true_oh = keras.utils.to_categorical(y_true, num_classes=FMA.NUM_CLASSES)
-
+    if args.dataset in ['fma_med', 'fma_large']:
         if args.features == 'stft':
             freq, time = 2049, 643  
             dim = (freq, time)
@@ -172,6 +211,26 @@ if __name__ == '__main__':
             freq, time = 12, 643
             dim = (freq, time)
         
+        if args.dataset == 'fma_med':
+            FMA = FMA.FreeMusicArchive('medium', 22050)
+
+            y_true = []
+            for i in FMA.PARTITION['test']:
+                y_true.append(FMA.TOP_GENRES[i])
+
+            y_true = np.array(y_true)    
+            y_true_oh = keras.utils.to_categorical(y_true, num_classes=FMA.NUM_CLASSES)
+        
+        if args.dataset == 'fma_large':
+            FMA = FMA.FreeMusicArchive('large', 22050)
+
+            y_true = []
+            for i in FMA.PARTITION['test']:
+                y_true.append(FMA.ALL_GENRES[i])
+
+            y_true = np.array(y_true)
+            y_true_oh = y_true
+
     elif args.dataset == 'cifar100':
         (_, _), (CIFAR_X, y_true) = cifar100.load_data(label_mode='fine')
         y_true_oh =  keras.utils.to_categorical(y_true, num_classes=100)
@@ -186,49 +245,94 @@ if __name__ == '__main__':
     else:
         raise Exception('Wrong dataset!')
 
-    results = pd.DataFrame({
-        'name':['Time','Freq','Simple','TimeFreq']
-    })
+    if args.test == 'sgc':
+        results = pd.DataFrame({
+            'name':['Time','Freq','Simple','TimeFreq']
+        })
 
-    hist_acc = []
-    hist_val_acc = []
+        hist_acc = []
+        hist_val_acc = []
 
-    accuracy = []
-    f1_macro = []
-    f1_micro = []
-    f1_weighted = []
-    softmax_out = []
+        accuracy = []
+        f1_macro = []
+        f1_micro = []
+        f1_weighted = []
+        softmax_out = []
 
-    epochs = []
+        epochs = []
 
-    for index, row in results.iterrows():
-        hist_path = './Models/cnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
-        
-        hist=pickle.load(open(hist_path, "rb" ))
-        hist_acc.append(hist['acc'])
-        hist_val_acc.append(hist['val_acc'])
-        epochs.append(len(hist['acc']))
-        
-        function = {'sgc':test_model_sgc}
+        for index, row in results.iterrows():
+            hist_path = './Models/cnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
+            
+            hist=pickle.load(open(hist_path, "rb" ))
+            hist_acc.append(hist['categorical_accuracy'])
+            hist_val_acc.append(hist['val_categorical_accuracy'])
+            epochs.append(len(hist['categorical_accuracy']))
 
-        sm, acc, macro, micro, weighted = function[args.test](model_name=row['name'], dim=dim, features=args.features, dataset=args.dataset)
-        accuracy.append(acc) 
-        f1_macro.append(macro) 
-        f1_micro.append(micro) 
-        f1_weighted.append(weighted)
-        softmax_out.append(sm) 
+            sm, acc, macro, micro, weighted = test_model_sgc(model_name=row['name'], dim=dim, features=args.features, dataset=args.dataset)
+            accuracy.append(acc) 
+            f1_macro.append(macro) 
+            f1_micro.append(micro) 
+            f1_weighted.append(weighted)
+            softmax_out.append(sm) 
 
-    results['hist_acc'] = hist_acc 
-    results['hist_val_acc'] = hist_val_acc 
+        results['hist_acc'] = hist_acc 
+        results['hist_val_acc'] = hist_val_acc 
 
-    results['accuracy'] = accuracy 
-    results['f1_macro'] = f1_macro
-    results['f1_micro'] = f1_micro
-    results['f1_weighted'] = f1_weighted
-    results['softmax_out'] = softmax_out 
+        results['accuracy'] = accuracy 
+        results['f1_macro'] = f1_macro
+        results['f1_micro'] = f1_micro
+        results['f1_weighted'] = f1_weighted
+        results['softmax_out'] = softmax_out 
 
-    results['epochs'] = epochs
+        results['epochs'] = epochs
 
-    save_path = './Results/cnn/sgc' + args.dataset + '.' + args.features  + '.pkl'
+        save_path = './Results/cnn/' + args.test + '/' + args.dataset + '.' + args.features  + '.pkl'
 
-    results.to_pickle(save_path)
+        results.to_pickle(save_path)
+
+    if args.test == 'mgc':
+        results = pd.DataFrame({
+            'name':['Time','Freq','Simple']
+        })
+
+        hist_cat_acc = []
+        hist_bin_acc = []
+        hist_mse = []
+        hist_val_loss = []
+
+        hamm = []
+        mse = []
+        sigmoid_out = []
+
+        epochs = []
+
+        for index, row in results.iterrows():
+            hist_path = './Models/cnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
+            
+            hist=pickle.load(open(hist_path, "rb" ))
+            hist_cat_acc.append(hist['categorical_accuracy'])
+            hist_bin_acc.append(hist['binary_accuracy'])
+            hist_mse.append(hist['mean_squared_error'])
+            hist_val_loss.append(hist['val_loss'])
+            epochs.append(len(hist['categorical_accuracy']))
+
+            sig_out, h, m = test_model_mgc(model_name=row['name'], dim=dim, features=args.features, dataset=args.dataset)
+            sigmoid_out.append(sig_out) 
+            hamm.append(h) 
+            mse.append(m) 
+
+        results['hist_cat_acc'] = hist_cat_acc 
+        results['hist_bin_acc'] = hist_bin_acc 
+        results['hist_mse'] = hist_mse 
+        results['hist_val_loss'] = hist_val_loss
+
+        results['hamm'] = hamm
+        results['mse'] = mse
+        results['sigmoid_out'] = sigmoid_out 
+
+        results['epochs'] = epochs
+
+        save_path = './Results/cnn/' + args.test + '/' + args.dataset + '.' + args.features  + '.pkl'
+
+        results.to_pickle(save_path)

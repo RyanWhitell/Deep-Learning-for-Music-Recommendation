@@ -16,7 +16,5 @@
 ::python results_cnn.py -d=fma_large -t=mgc -f=mel_scaled_stft
 ::python results_cnn.py -d=fma_large -t=mgc -f=cqt
 
-::python results_rnn.py -d=fma_large -t=sgc -f=mfcc
-::python results_rnn.py -d=fma_large -t=sgc -f=chroma
-
-::python results_ens.py -d=fma_large -t=mgc
+python results_rnn.py -d=fma_large -t=mgc -f=mfcc
+python results_rnn.py -d=fma_large -t=mgc -f=chroma

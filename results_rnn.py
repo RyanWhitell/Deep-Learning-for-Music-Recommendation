@@ -10,8 +10,6 @@ from keras.models import load_model
 from keras import backend as K
 from keras.utils import to_categorical
 
-from keras.datasets import cifar100
-
 import h5py
 import pickle
 
@@ -70,19 +68,24 @@ class DataGenerator(keras.utils.Sequence):
     def __data_generation(self, list_IDs_temp):
         'Generates data containing batch_size samples' 
         X = np.empty((self.batch_size, self.dim[1], self.dim[0]))
-        y = np.empty((self.batch_size), dtype=int)
+
+        if self.test_type == 'sgc':
+            y = np.empty((self.batch_size), dtype=int)
+        if self.test_type == 'mgc':
+            y = np.empty((self.batch_size, self.n_classes), dtype=int)
 
         with h5py.File(self.data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
                 X[i,] = f['data'][str(ID)]
-                y[i] = self.labels[ID]
+                if self.test_type == 'sgc':
+                    y[i] = self.labels[ID]
+                if self.test_type == 'mgc':
+                    y[i,:] = self.labels[ID]
             
         if self.test_type == 'sgc':
             return X.reshape(X.shape[0], *self.dim), keras.utils.to_categorical(y, num_classes=self.n_classes)
         elif self.test_type == 'mgc':
             return X.reshape(X.shape[0], *self.dim), y
-        else:
-            raise Exception('Unknown test type!')
 
 def test_model_sgc(model_name, dim, features, dataset):
     K.clear_session()
@@ -134,17 +137,51 @@ def test_model_sgc(model_name, dim, features, dataset):
     
     return softmax_out, acc, f1_macro, f1_micro, f1_weighted
 
+def test_model_mgc(model_name, dim, features, dataset):
+    K.clear_session()
+    
+    model_path = './Models/rnn/mgc/' + dataset + '.' + features + '.' + model_name + '.hdf5'
+
+    model = load_model(model_path)
+
+    if dataset == 'fma_large':
+        test_list = FMA.PARTITION['test']
+        labels = FMA.ALL_GENRES
+        num_classes = FMA.NUM_CLASSES
+
+        tbs = 1
+        for i in range(1,17):
+            if len(test_list) % i == 0:
+                tbs = i
+        
+        test_generator = DataGenerator(
+            list_IDs=test_list,
+            labels=labels,
+            batch_size=tbs,
+            dim=dim,
+            n_classes=num_classes,
+            features=features,
+            dataset=dataset,
+            test_type='mgc',
+            shuffle=False
+        )
+
+        sigmoid_out = model.predict_generator(
+            generator=test_generator,
+            verbose=1
+        )
+
+    predicted = np.asarray(np.around(sigmoid_out), dtype=np.int)
+
+    hamm = metrics.hamming_loss(y_true, predicted)
+    mse = np.mean((y_true - sigmoid_out)**2)
+
+    print(f'{model_path}\nhamm {hamm:.6f} mse {mse:.6f}')
+    
+    return sigmoid_out, hamm, mse
+
 if __name__ == '__main__':
-    if args.dataset == 'fma_med':
-        FMA = FMA.FreeMusicArchive('medium', 22050)
-
-        y_true = []
-        for i in FMA.PARTITION['test']:
-            y_true.append(FMA.TOP_GENRES[i])
-
-        y_true = np.array(y_true)    
-        y_true_oh = keras.utils.to_categorical(y_true, num_classes=FMA.NUM_CLASSES)
-
+    if args.dataset in ['fma_med', 'fma_large']:
         if args.features == 'stft':
             freq, time = 2049, 643  
             dim = (time, freq)
@@ -164,32 +201,75 @@ if __name__ == '__main__':
         if args.features in ['chroma', 'mfcc']:
             freq, time = 12, 643
             dim = (time, freq)
+        
+        if args.dataset == 'fma_med':
+            FMA = FMA.FreeMusicArchive('medium', 22050)
+
+            y_true = []
+            for i in FMA.PARTITION['test']:
+                y_true.append(FMA.TOP_GENRES[i])
+
+            y_true = np.array(y_true)    
+            y_true_oh = keras.utils.to_categorical(y_true, num_classes=FMA.NUM_CLASSES)
+        
+        if args.dataset == 'fma_large':
+            FMA = FMA.FreeMusicArchive('large', 22050)
+
+            y_true = []
+            for i in FMA.PARTITION['test']:
+                y_true.append(FMA.ALL_GENRES[i])
+
+            y_true = np.array(y_true)
+            y_true_oh = y_true
 
     else:
         raise Exception('Wrong dataset!')
 
+    if args.test == 'sgc':
+        results = pd.DataFrame({
+            'name':['RNN']
+        })
 
-    results = pd.DataFrame({
-        'name':['RNN']
-    })
+        hist_path = './Models/rnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + 'RNN' + '.history.pkl'
+        hist=pickle.load(open(hist_path, "rb" ))
 
-    hist_path = './Models/rnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + 'RNN' + '.history.pkl'
-    hist=pickle.load(open(hist_path, "rb" ))
-
-    results['hist_acc'] = [hist['categorical_accuracy']]
-    results['hist_val_acc'] = [hist['val_categorical_accuracy']]
-    results['epochs'] = len(hist['categorical_accuracy'])
+        results['hist_acc'] = [hist['categorical_accuracy']]
+        results['hist_val_acc'] = [hist['val_categorical_accuracy']]
+        results['epochs'] = len(hist['categorical_accuracy'])
     
-    function = {'sgc':test_model_sgc}
 
-    sm, acc, macro, micro, weighted = function[args.test](model_name='RNN', dim=dim, features=args.features, dataset=args.dataset)
+        sm, acc, macro, micro, weighted = test_model_sgc(model_name='RNN', dim=dim, features=args.features, dataset=args.dataset)
 
-    results['accuracy'] = acc 
-    results['f1_macro'] = macro
-    results['f1_micro'] = micro
-    results['f1_weighted'] = weighted
-    results['softmax_out'] = [sm] 
+        results['accuracy'] = acc 
+        results['f1_macro'] = macro
+        results['f1_micro'] = micro
+        results['f1_weighted'] = weighted
+        results['softmax_out'] = [sm] 
 
-    save_path = './Results/rnn/' + args.test + '/' + args.dataset + '.' + args.features  + '.pkl'
+        save_path = './Results/rnn/' + args.test + '/' + args.dataset + '.' + args.features  + '.pkl'
 
-    results.to_pickle(save_path)
+        results.to_pickle(save_path)
+
+    if args.test == 'mgc':
+        results = pd.DataFrame({
+            'name':['RNN']
+        })
+
+        hist_path = './Models/rnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + 'RNN' + '.history.pkl'
+        hist=pickle.load(open(hist_path, "rb" ))
+
+        results['hist_cat_acc'] = [hist['categorical_accuracy']]
+        results['hist_bin_acc'] = [hist['binary_accuracy']]
+        results['hist_mse'] = len(hist['mean_squared_error'])
+        results['hist_val_loss'] = len(hist['val_loss'])
+        results['epochs'] = len(hist['categorical_accuracy'])
+
+        sig_out, h, m = test_model_mgc(model_name='RNN', dim=dim, features=args.features, dataset=args.dataset)
+
+        results['hamm'] = h
+        results['mse'] = m
+        results['sigmoid_out'] = [sig_out] 
+
+        save_path = './Results/rnn/' + args.test + '/' + args.dataset + '.' + args.features  + '.pkl'
+
+        results.to_pickle(save_path)

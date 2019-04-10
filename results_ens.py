@@ -10,8 +10,6 @@ from keras.models import load_model
 from keras import backend as K
 from keras.utils import to_categorical
 
-from keras.datasets import cifar100
-
 import h5py
 import pickle
 
@@ -23,8 +21,8 @@ warnings.filterwarnings("ignore")
 import FMA
 
 parser = argparse.ArgumentParser(description="gets testing results from a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large')
-parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc)')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
+parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc)')
 args = parser.parse_args()
 
 class DataGenerator(keras.utils.Sequence):
@@ -76,10 +74,16 @@ class DataGenerator(keras.utils.Sequence):
         X_chroma = np.empty((self.batch_size, 12,   643))
         X_mfcc   = np.empty((self.batch_size, 12,   643))
         
-        y = np.empty((self.batch_size), dtype=int)
+        if self.test_type == 'sgc':
+            y = np.empty((self.batch_size), dtype=int)
+        if self.test_type == 'mgc':
+            y = np.empty((self.batch_size, self.n_classes), dtype=int)
         
         for i, ID in enumerate(list_IDs_temp):
-            y[i] = self.labels[ID]
+            if self.test_type == 'sgc':
+                y[i] = self.labels[ID]
+            if self.test_type == 'mgc':
+                y[i,:] = self.labels[ID]
             
         with h5py.File(self.stft_data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
