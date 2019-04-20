@@ -1,6 +1,7 @@
 import os
 
 import h5py
+import pickle
 import time
 import multiprocessing
 from tqdm import tqdm
@@ -18,7 +19,7 @@ import argparse
 import FMA
 
 parser = argparse.ArgumentParser(description="extracts features")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large, spotify')
 parser.add_argument('-f', '--features', required=True, help='which features to extract: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 parser.add_argument('-q', '--quick', default=False, help='runs each extraction quickly to ensure they will extract')
 parser.add_argument('-c', '--cores', default=1, help='number of cores to use')
@@ -159,7 +160,7 @@ def get_fma_mfcc(track_id):
     
     return track_id, scaler.fit_transform(mfcc[:,:643])
 
-def extract(ids, fma_set, features, quick, cores):
+def extract_fma(ids, fma_set, features, quick, cores):
     if quick:
         ids = ids[:100]
         file_path = './Data/features/DELETE.fma_' + fma_set + '_' + features + '.hdf5'
@@ -193,6 +194,154 @@ def extract(ids, fma_set, features, quick, cores):
     f.close()
 
 
+def get_spotify_stft(track_id):
+    pass
+
+def get_spotify_stft_halved(track_id):
+    scaler = sklearn.preprocessing.StandardScaler()
+
+    sr=22050
+    n_fft=4096
+    hop_length=1024
+    win_length=4096
+    window='hann'
+
+    file_path = './Data/Spotify/audio/' + track_id + '.mp3'
+
+    try:
+        y, _ = lr.load(path=file_path, sr=sr)
+        spectrum = lr.stft(y=y, n_fft=n_fft, hop_length=hop_length, win_length=win_length, window=window)
+    except Exception:
+        traceback.print_exc()
+        print('*'*20, str(track_id))
+        return track_id, None
+    
+    return track_id, scaler.fit_transform(lr.amplitude_to_db(np.abs(spectrum[:,:643])))[0:1024,:]
+
+def get_spotify_mel_scaled_stft(track_id):
+    scaler = sklearn.preprocessing.StandardScaler()
+
+    sr=22050
+    n_fft=4096
+    hop_length=1024
+    #win_length=4096
+    #window='hann'
+
+    file_path = './Data/Spotify/audio/' + track_id + '.mp3'
+
+    try:
+        y, _ = lr.load(path=file_path, sr=sr)
+        mel_spec = lr.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=256)
+    except Exception:
+        traceback.print_exc()
+        print('*'*20, str(track_id))
+        return track_id, None
+    
+    return track_id, scaler.fit_transform(lr.power_to_db(mel_spec[:,:643]))
+
+def get_spotify_cqt(track_id):
+    scaler = sklearn.preprocessing.StandardScaler()
+
+    sr=22050
+    hop_length=1024
+    window='hann'
+    
+    file_path = './Data/Spotify/audio/' + track_id + '.mp3'
+
+    try:
+        y, _ = lr.load(path=file_path, sr=sr)
+        cqt = np.abs(lr.core.cqt(y=y, sr=sr, hop_length=hop_length, window=window, n_bins=84*2, bins_per_octave=12*2))
+    except Exception:
+        traceback.print_exc()
+        print('*'*20, str(track_id))
+        return track_id, None
+    
+    return track_id, scaler.fit_transform(lr.amplitude_to_db(cqt[:,:643]))
+
+def get_spotify_chroma(track_id):
+    scaler = sklearn.preprocessing.StandardScaler()
+
+    # cqt:
+    sr=22050
+    hop_length=1024
+    window='hann'
+    #n_bins=n_octaves * bins_per_octave
+    bins_per_octave=12*2
+
+    # fold:
+    # n_chroma=12
+    # n_octaves=7
+
+    file_path = './Data/Spotify/audio/' + track_id + '.mp3'
+
+    try:
+        y, _ = lr.load(path=file_path, sr=sr)
+        chroma = lr.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, bins_per_octave=bins_per_octave)
+    except Exception:
+        traceback.print_exc()
+        print('*'*20, str(track_id))
+        return track_id, None
+
+    return track_id, scaler.fit_transform(chroma[:,:643])
+
+def get_spotify_mfcc(track_id):
+    scaler = sklearn.preprocessing.StandardScaler()
+
+    # mfcc:
+    sr=22050
+    n_mfcc=13
+
+    # mel-scaled spectrogram
+    kwargs = {'n_fft':4096, 'hop_length':1024, 'n_mels':256}
+
+    # Can use the pre-computed mel scaled spectrogram
+    file_path = './Data/features/spotify_mel_scaled_stft.hdf5'
+
+    try:
+        with h5py.File(file_path,'r') as f:
+            S = f['data'][str(track_id)][()]
+        mfcc = lr.feature.mfcc(S=S, sr=sr, n_mfcc=n_mfcc, **kwargs)[1:]
+    except Exception:
+        traceback.print_exc()
+        print('*'*20, str(track_id))
+        return track_id, None
+    
+    return track_id, scaler.fit_transform(mfcc[:,:643])
+
+def extract_spotify(ids, features, quick, cores):
+    if quick:
+        ids = ids[:100]
+        file_path = './Data/features/DELETE.spotify_' + features + '.hdf5'
+    else:
+        file_path = './Data/features/spotify_' + features + '.hdf5'
+    
+    if os.path.isfile(file_path):
+        f = h5py.File(file_path, 'a')
+        data = f['data']
+        ids = list(set(ids) - set(data.keys()))
+        print(f'File already in path, attempting to add missing ids of which there are {len(ids)}')
+    else:
+        f = h5py.File(file_path, 'a')
+        data = f.create_group('data')
+
+    func = {
+        'stft': get_spotify_stft, 
+        'stft_halved': get_spotify_stft_halved,
+        'mel_scaled_stft': get_spotify_mel_scaled_stft,
+        'cqt': get_spotify_cqt,
+        'chroma': get_spotify_chroma,
+        'mfcc': get_spotify_mfcc
+    }
+
+    pool = multiprocessing.Pool(cores)
+
+    for i, spec in tqdm(pool.imap_unordered(func[features], ids), total=len(ids)):
+        if spec is not None:
+            data[str(i)] = spec
+
+    f.close()
+
+
 if __name__=='__main__':
     print('File Start...')
     file_start = time.perf_counter()
@@ -201,12 +350,24 @@ if __name__=='__main__':
         FMA = FMA.FreeMusicArchive('medium', 22050)
         ids = FMA.TRACKS.index.values
 
-        extract(ids, 'med', args.features, args.quick, int(args.cores))
+        extract_fma(ids, 'med', args.features, args.quick, int(args.cores))
 
     if args.dataset == 'fma_large':
         FMA = FMA.FreeMusicArchive('large', 22050)
         ids = FMA.TRACKS.index.values
 
-        extract(ids, 'large', args.features, args.quick, int(args.cores))
+        extract_fma(ids, 'large', args.features, args.quick, int(args.cores))
+
+    if args.dataset == 'spotify':
+        with open('./Data/Spotify/data_checkpoint.pickle', 'rb') as f:
+            save = pickle.load(f)
+            TRACKS = save['tracks']
+            del save
+
+        ids = TRACKS.index.values
+
+        extract_spotify(ids, args.features, args.quick, int(args.cores))
+
+
 
     print(f'Total file execution time: {time.perf_counter()-file_start:.2f}s')
