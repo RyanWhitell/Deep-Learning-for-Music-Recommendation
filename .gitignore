@@ -131,3 +131,17 @@ Spotify/external_datasets/*.xlsx
 Spotify/external_datasets/artist_location.txt
 Spotify/external_datasets/*.pickle
 Spotify/external_datasets/unique_artists.txt
+Spotify/external_datasets/ArtistUrl.csv
+Spotify/external_datasets/Lyrics1.csv
+Spotify/external_datasets/Lyrics2.csv
+Spotify/external_datasets/SpotifyFeatures.csv
+Spotify/external_datasets/billboard_lyrics_1964-2015.csv
+Spotify/external_datasets/license.txt
+Spotify/external_datasets/lyrics.csv
+Spotify/external_datasets/songdata.csv
+Spotify/external_datasets/worldcities.csv
+
+
+# Temp files
+to_delete/*
+Spotify/to_delete/*
