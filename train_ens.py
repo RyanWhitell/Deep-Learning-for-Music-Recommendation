@@ -187,8 +187,7 @@ def train_model(model, model_name, dataset, test_type, quick):
                 batch_size=vbs,
                 n_classes=num_classes,
                 dataset=dataset,
-                test_type=test_type,
-                shuffle=False
+                test_type=test_type
             )
 
             history = model.fit_generator(

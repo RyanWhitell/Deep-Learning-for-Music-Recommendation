@@ -15,10 +15,11 @@ import pickle
 import argparse
 
 import FMA
+import SPOTIFY
 
 parser = argparse.ArgumentParser(description="trains a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large, cifar100')
-parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc)')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large, spotify, cifar100')
+parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc). cosine/mse distance regression (cos/mse).')
 parser.add_argument('-f', '--features', default='', help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
@@ -28,9 +29,61 @@ Valid test combinations:
 cifar100
 fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 fma_large -> mgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
+spotify -> cos, mse -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 """
 
-class DataGenerator(keras.utils.Sequence):
+class DataGeneratorSPOTIFY(keras.utils.Sequence):
+    'Generates data for Keras'
+    def __init__(self, list_IDs, labels, emb_dim, batch_size, dim, features, n_channels=1, shuffle=True):
+        'Initialization'
+        self.list_IDs = list_IDs
+        self.labels = labels
+        self.emb_dim = emb_dim
+        self.batch_size = batch_size
+        self.dim = dim
+        self.features = features
+        self.data_path = './Data/features/spotify_' + features + '.hdf5'
+        self.n_channels = n_channels
+        self.shuffle = shuffle
+        self.on_epoch_end()
+
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        return int(np.floor(len(self.list_IDs) / self.batch_size))
+
+    def __getitem__(self, index):
+        'Generate one batch of data'
+        # Generate indexes of the batch
+        indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
+        
+
+        # Find list of IDs
+        list_IDs_temp = [self.list_IDs[k] for k in indexes]
+
+        # Generate data
+        X, y = self.__data_generation(list_IDs_temp)
+
+        return X, y
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        self.indexes = np.arange(len(self.list_IDs))
+        if self.shuffle == True:
+            np.random.shuffle(self.indexes)
+
+    def __data_generation(self, list_IDs_temp):
+        'Generates data containing batch_size samples' 
+        X = np.empty((self.batch_size, *self.dim))       
+        Y = np.empty((self.batch_size, self.emb_dim))
+
+        with h5py.File(self.data_path,'r') as f:
+            for i, ID in enumerate(list_IDs_temp):
+                X[i,] = f['data'][str(ID)]
+                Y[i,:] = self.labels[ID]
+        
+        return X.reshape(X.shape[0], *self.dim, 1), Y
+
+class DataGeneratorFMA(keras.utils.Sequence):
     'Generates data for Keras'
     def __init__(self, list_IDs, labels, batch_size, dim, n_classes, features, dataset, test_type, n_channels=1, shuffle=True):
         'Initialization'
@@ -144,7 +197,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
             else:
                 epochs = 500
     
-            training_generator = DataGenerator(
+            training_generator = DataGeneratorFMA(
                 list_IDs=train_list,
                 labels=labels,
                 batch_size=8,
@@ -160,7 +213,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 if len(val_list) % i == 0:
                     vbs = i
 
-            val_generator = DataGenerator(
+            val_generator = DataGeneratorFMA(
                 list_IDs=val_list,
                 labels=labels,
                 batch_size=vbs,
@@ -168,8 +221,70 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 n_classes=num_classes,
                 features=features,
                 dataset=dataset,
-                test_type=test_type,
-                shuffle=False
+                test_type=test_type
+            )
+
+            history = model.fit_generator(
+                generator=training_generator,
+                validation_data=val_generator,
+                epochs=epochs,
+                verbose=1,
+                callbacks=callbacks_list
+            )
+
+        elif dataset == 'spotify':
+            train_list = list(SPOTIFY.DATA.loc[SPOTIFY.DATA.split == 'train'].index.values)
+            val_list = list(SPOTIFY.DATA.loc[SPOTIFY.DATA.split == 'val'].index.values)
+            labels = labels = SPOTIFY.DATA[['embedding_vector']].to_dict()['embedding_vector']
+            emb_dim = SPOTIFY.EMB_DIM
+
+            if test_type == 'cos':
+                model.compile(
+                    loss=keras.losses.cosine_proximity,
+                    optimizer=keras.optimizers.Adam(),
+                    metrics=['mean_squared_error']
+                )
+            elif test_type == 'mse':
+                model.compile(
+                    loss=keras.losses.mean_squared_error,
+                    optimizer=keras.optimizers.Adam(),
+                    metrics=['cosine_proximity']
+                )
+            else:
+                raise Exception('Unknown test type!')
+
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+            early_stop = EarlyStopping(monitor='val_loss', patience=10, mode='min') 
+            callbacks_list = [checkpoint, early_stop]
+
+            if quick:
+                epochs = 1
+                train_list = train_list[:64]
+                val_list = train_list[:64]
+            else:
+                epochs = 500
+    
+            training_generator = DataGeneratorSPOTIFY(
+                list_IDs=train_list,
+                labels=labels,
+                emb_dim=emb_dim,
+                batch_size=8,
+                dim=(dim[0], dim[1]),
+                features=features,
+            )
+
+            vbs = 1
+            for i in range(1,17):
+                if len(val_list) % i == 0:
+                    vbs = i
+
+            val_generator = DataGeneratorSPOTIFY(
+                list_IDs=val_list,
+                labels=labels,
+                emb_dim=emb_dim,
+                batch_size=vbs,
+                dim=(dim[0], dim[1]),
+                features=features
             )
 
             history = model.fit_generator(
@@ -297,6 +412,8 @@ def Simple(features, test_type, input_shape, num_classes):
         output_activation = 'softmax'
     elif test_type == 'mgc':
         output_activation = 'sigmoid'
+    elif test_type in ['cos', 'mse']:
+        output_activation = 'linear'
 
     pred = layers.Activation(output_activation, name=output_activation)(x)
 
@@ -389,6 +506,8 @@ def Time(features, test_type, iks, input_shape, num_classes):
         output_activation = 'softmax'
     elif test_type == 'mgc':
         output_activation = 'sigmoid'
+    elif test_type in ['cos', 'mse']:
+        output_activation = 'linear'
 
     pred = layers.Activation(output_activation, name=output_activation)(x)
 
@@ -469,16 +588,18 @@ def Freq(features, test_type, iks, input_shape, num_classes):
     x = layers.GlobalAveragePooling2D(name='GAP')(x)
 
     x = layers.Dense(num_classes, name='logits')(x)
-    
+
     if test_type == 'sgc':
         output_activation = 'softmax'
     elif test_type == 'mgc':
         output_activation = 'sigmoid'
+    elif test_type in ['cos', 'mse']:
+         output_activation = 'linear'
 
     pred = layers.Activation(output_activation, name=output_activation)(x)
 
     return Model(inputs=inputs, outputs=pred)
-  
+
 def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
     if quick:
         time_path = './Models/cnn/' + test_type + '/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
@@ -506,38 +627,71 @@ def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
     
     x = layers.concatenate([t,f], name='Time_Freq')
     
-    if test_type == 'mgc':
-        x = layers.Dense(1024, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_0')(x)
-        x = layers.Activation('relu', name='fc_0_relu')(x)
-        x = layers.Dropout(0.5, name='fc_0_dropout')(x)
+    # Input: 32
+    # Output: 16
+    if test_type == 'sgc':
+        x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
+        x = layers.Activation('relu', name='fc_1_relu')(x)
+        x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+        
+        x = layers.Dense(128, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
+        x = layers.Activation('relu', name='fc_2_relu')(x)
+        x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+        
+        x = layers.Dense(num_classes, name='logits')(x)
 
-    x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
-    x = layers.Activation('relu', name='fc_1_relu')(x)
-    x = layers.Dropout(0.5, name='fc_1_dropout')(x)
-    
-    x = layers.Dense(128, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
-    x = layers.Activation('relu', name='fc_2_relu')(x)
-    x = layers.Dropout(0.5, name='fc_2_dropout')(x)
-    
-    x = layers.Dense(num_classes, name='logits')(x)
+    # Input: 322 
+    # Output: 161
+    elif test_type == 'mgc':
+        x = layers.Dense(512, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
+        x = layers.Activation('relu', name='fc_1_relu')(x)
+        x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+
+        x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
+        x = layers.Activation('relu', name='fc_2_relu')(x)
+        x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+
+        x = layers.Dense(num_classes, name='logits')(x)
+
+    # Input: 1600
+    # Output: 800
+    elif test_type in ['cos', 'mse']:
+        x = layers.Dense(2048, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
+        x = layers.Activation('relu', name='fc_1_relu')(x)
+        x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+        
+        x = layers.Dense(1024, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
+        x = layers.Activation('relu', name='fc_2_relu')(x)
+        x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+        
+        x = layers.Dense(num_classes, name='logits')(x)
+
     
     if test_type == 'sgc':
         output_activation = 'softmax'
     elif test_type == 'mgc':
         output_activation = 'sigmoid'
+    elif test_type in ['cos', 'mse']:
+        output_activation = 'linear'
 
     pred = layers.Activation(output_activation, name=output_activation)(x)
     
     return Model(inputs=inputs, outputs=pred)
 
-
 if __name__ == '__main__':
-    if args.dataset in ['fma_med', 'fma_large']:
+    if args.dataset in ['fma_med', 'fma_large', 'spotify']:
         if args.dataset == 'fma_med':
             FMA = FMA.FreeMusicArchive('medium', 22050)
+            num_classes = FMA.NUM_CLASSES
+
         elif args.dataset == 'fma_large':
             FMA = FMA.FreeMusicArchive('large', 22050)
-        num_classes = FMA.NUM_CLASSES
+            num_classes = FMA.NUM_CLASSES
+
+        elif args.dataset == 'spotify':
+            SPOTIFY = SPOTIFY.SPOTIFY()
+            num_classes = SPOTIFY.EMB_DIM
+            
         if args.features == 'stft':
             freq, time = 2049, 643  
             dim = (freq, time, 1)
@@ -601,7 +755,7 @@ if __name__ == '__main__':
     train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
 
     ################ TimeFreq ################
-    K.clear_session()
-    model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
-    model.summary()
-    train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       
+    #K.clear_session()
+    #model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
+    #model.summary()
+    #train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       
