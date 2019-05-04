@@ -611,7 +611,6 @@ def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
     time_model = load_model(time_path)
     freq_model = load_model(freq_path)
 
-
     time_model = Model(inputs=time_model.input, outputs=time_model.get_layer('logits').output)
     freq_model = Model(inputs=freq_model.input, outputs=freq_model.get_layer('logits').output)
 
@@ -622,51 +621,30 @@ def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
 
     inputs = layers.Input(shape=input_shape)
     
-    t = time_model(inputs)
-    f = freq_model(inputs)
-    
-    x = layers.concatenate([t,f], name='Time_Freq')
-    
-    # Input: 32
-    # Output: 16
     if test_type == 'sgc':
-        x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
-        x = layers.Activation('relu', name='fc_1_relu')(x)
-        x = layers.Dropout(0.5, name='fc_1_dropout')(x)
-        
-        x = layers.Dense(128, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
-        x = layers.Activation('relu', name='fc_2_relu')(x)
-        x = layers.Dropout(0.5, name='fc_2_dropout')(x)
-        
-        x = layers.Dense(num_classes, name='logits')(x)
+        # 16 logits
+        d1, d2, d3, d4 = 256, 1024, 512, 256
+    if test_type == 'mgc':
+        # 161 logits
+        d1, d2, d3, d4 = 512, 2048, 1024, 512
+    if test_type in ['cos', 'mse']:
+        # 800 logits
+        d1, d2, d3, d4 = 1024, 4096, 2048, 1024
 
-    # Input: 322 
-    # Output: 161
-    elif test_type == 'mgc':
-        x = layers.Dense(512, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
-        x = layers.Activation('relu', name='fc_1_relu')(x)
-        x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+    t = time_model(inputs)
+    t = layers.Dense(d1, activation='relu', name='time_input')(t)
 
-        x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
-        x = layers.Activation('relu', name='fc_2_relu')(x)
-        x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+    f = freq_model(inputs)
+    f = layers.Dense(d1, activation='relu', name='freq_input')(f)
 
-        x = layers.Dense(num_classes, name='logits')(x)
+    x = layers.concatenate([t,f], name='Time_Freq')
 
-    # Input: 1600
-    # Output: 800
-    elif test_type in ['cos', 'mse']:
-        x = layers.Dense(2048, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
-        x = layers.Activation('relu', name='fc_1_relu')(x)
-        x = layers.Dropout(0.5, name='fc_1_dropout')(x)
-        
-        x = layers.Dense(1024, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
-        x = layers.Activation('relu', name='fc_2_relu')(x)
-        x = layers.Dropout(0.5, name='fc_2_dropout')(x)
-        
-        x = layers.Dense(num_classes, name='logits')(x)
-
+    x = layers.Dense(d2, activation='relu', name='fc1')(x)
     
+    x = layers.Dense(d3, activation='relu', name='fc2')(x)
+
+    x = layers.Dense(d4, activation='relu', name='fc3')(x)
+
     if test_type == 'sgc':
         output_activation = 'softmax'
     elif test_type == 'mgc':
@@ -674,7 +652,7 @@ def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
     elif test_type in ['cos', 'mse']:
         output_activation = 'linear'
 
-    pred = layers.Activation(output_activation, name=output_activation)(x)
+    pred = layers.Dense(num_classes, activation=output_activation, name=output_activation)(x)
     
     return Model(inputs=inputs, outputs=pred)
 
@@ -736,26 +714,26 @@ if __name__ == '__main__':
     else:
         raise Exception('Wrong dataset!')
 
-    ################# Freq ################
-    K.clear_session()
-    model = Freq(features=args.features, test_type=args.test, iks=fiks, input_shape=dim, num_classes=num_classes)
-    model.summary()
-    train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick) 
-
-    ################ Time ################
-    K.clear_session()
-    model = Time(features=args.features, test_type=args.test, iks=tiks, input_shape=dim, num_classes=num_classes)
-    model.summary()
-    train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
-
-    ################ Simple ################
-    K.clear_session()
-    model = Simple(features=args.features, test_type=args.test, input_shape=dim, num_classes=num_classes)
-    model.summary()
-    train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
-
-    ################ TimeFreq ################
+    ################## Freq ################
     #K.clear_session()
-    #model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
+    #model = Freq(features=args.features, test_type=args.test, iks=fiks, input_shape=dim, num_classes=num_classes)
     #model.summary()
-    #train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       
+    #train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick) 
+
+    ################# Time ################
+    #K.clear_session()
+    #model = Time(features=args.features, test_type=args.test, iks=tiks, input_shape=dim, num_classes=num_classes)
+    #model.summary()
+    #train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
+
+    ################# Simple ################
+    #K.clear_session()
+    #model = Simple(features=args.features, test_type=args.test, input_shape=dim, num_classes=num_classes)
+    #model.summary()
+    #train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
+
+    ############### TimeFreq ################
+    K.clear_session()
+    model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
+    model.summary()
+    train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       

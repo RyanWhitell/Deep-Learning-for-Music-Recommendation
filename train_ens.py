@@ -287,36 +287,56 @@ def ENS(dataset, test_type, num_classes, quick):
     chroma = chroma_rnn_model(X_chroma)
     mfcc = mfcc_rnn_model(X_mfcc)
     
-    x = layers.concatenate([stft_t, mel_t, cqt_t, stft_f, mel_f, cqt_f, chroma, mfcc], name='All_Model_Logits')
-    
+    if test_type == 'sgc':
+        # 16 logits
+        d1, d2, d3, d4, d5 = 256, 4096, 2048, 512, 256
     if test_type == 'mgc':
-        x = layers.Dense(2048, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_0')(x)
-        x = layers.Activation('relu', name='fc_0_relu')(x)
-        x = layers.Dropout(0.5, name='fc_0_dropout')(x)
+        # 161 logits
+        d1, d2, d3, d4, d5 = 512, 8192, 4096, 1024, 512
 
-    x = layers.Dense(1024, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
-    x = layers.Activation('relu', name='fc_1_relu')(x)
-    x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+    stft_t = stft_time_model(X_stft)
+    stft_t = layers.Dense(d1, activation='relu', name='stft_time_model_input')(stft_t)
+
+    mel_t = mel_time_model(X_mel)
+    mel_t = layers.Dense(d1, activation='relu', name='mel_time_model_input')(mel_t)
+
+    cqt_t = cqt_time_model(X_cqt)
+    cqt_t = layers.Dense(d1, activation='relu', name='cqt_time_model_input')(cqt_t)
     
-    x = layers.Dense(512, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
-    x = layers.Activation('relu', name='fc_2_relu')(x)
-    x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+    stft_f = stft_freq_model(X_stft)
+    stft_f = layers.Dense(d1, activation='relu', name='stft_freq_model_input')(stft_f)
+
+    mel_f = mel_freq_model(X_mel)
+    mel_f = layers.Dense(d1, activation='relu', name='mel_freq_model_input')(mel_f)
+
+    cqt_f = cqt_freq_model(X_cqt)
+    cqt_f = layers.Dense(d1, activation='relu', name='cqt_freq_model_input')(cqt_f)
     
-    x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_3')(x)
-    x = layers.Activation('relu', name='fc_3_relu')(x)
-    x = layers.Dropout(0.5, name='fc_3_dropout')(x)
+    chroma = chroma_rnn_model(X_chroma)
+    chroma = layers.Dense(d1, activation='relu', name='chroma_rnn_model_input')(chroma)
+
+    mfcc = mfcc_rnn_model(X_mfcc)
+    mfcc = layers.Dense(d1, activation='relu', name='mfcc_rnn_model_input')(mfcc)
+
+    x = layers.concatenate([stft_t, mel_t, cqt_t, stft_f, mel_f, cqt_f, chroma, mfcc], name='All_Model_Logits')
+
+    x = layers.Dense(d2, activation='relu', name='fc1')(x)
     
-    x = layers.Dense(num_classes, name='logits')(x)
-    
+    x = layers.Dense(d3, activation='relu', name='fc2')(x)
+
+    x = layers.Dense(d4, activation='relu', name='fc3')(x)
+
+    x = layers.Dense(d5, activation='relu', name='fc4')(x)
+
     if test_type == 'sgc':
         output_activation = 'softmax'
     elif test_type == 'mgc':
         output_activation = 'sigmoid'
 
+    pred = layers.Dense(num_classes, activation=output_activation, name=output_activation)(x)
     pred = layers.Activation(output_activation, name=output_activation)(x)
     
     return Model(inputs=[X_stft, X_mel, X_cqt, X_chroma, X_mfcc], outputs=pred)
-
 
 if __name__ == '__main__':
     if args.dataset in ['fma_med', 'fma_large']:

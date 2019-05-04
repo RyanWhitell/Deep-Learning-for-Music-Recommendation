@@ -32,7 +32,7 @@ fma_large -> mgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 
 class DataGeneratorSPOTIFY(keras.utils.Sequence):
     'Generates data for Keras'
-    def __init__(self, list_IDs, labels, emb_dim, batch_size, dim, features, n_channels=1, shuffle=True):
+    def __init__(self, list_IDs, labels, emb_dim, batch_size, dim, features, shuffle=True):
         'Initialization'
         self.list_IDs = list_IDs
         self.labels = labels
@@ -41,7 +41,6 @@ class DataGeneratorSPOTIFY(keras.utils.Sequence):
         self.dim = dim
         self.features = features
         self.data_path = './Data/features/spotify_' + features + '.hdf5'
-        self.n_channels = n_channels
         self.shuffle = shuffle
         self.on_epoch_end()
 
