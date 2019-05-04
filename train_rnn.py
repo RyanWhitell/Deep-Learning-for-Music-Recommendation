@@ -281,7 +281,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
             else:
                 raise Exception('Unknown test type!')
 
-            checkpoint = ModelCheckpoint(model_name + 'pre_train_lr_00005.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+            checkpoint = ModelCheckpoint(model_name + '_pre_train_lr_00005.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
             early_stop = EarlyStopping(monitor='val_loss', patience=3, mode='min', restore_best_weights=True) 
             callbacks_list = [checkpoint, early_stop]
 
@@ -293,7 +293,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 callbacks=callbacks_list
             )
 
-            with open(model_name + 'pre_train_lr_00005.history.pkl', 'wb') as file_pi:
+            with open(model_name + '_pre_train_lr_00005.history.pkl', 'wb') as file_pi:
                 pickle.dump(history.history, file_pi)
 
             ################################################# lr = 0.00001

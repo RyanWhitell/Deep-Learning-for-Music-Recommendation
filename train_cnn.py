@@ -235,7 +235,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
         elif dataset == 'spotify':
             train_list = list(SPOTIFY.DATA.loc[SPOTIFY.DATA.split == 'train'].index.values)
             val_list = list(SPOTIFY.DATA.loc[SPOTIFY.DATA.split == 'val'].index.values)
-            labels = labels = SPOTIFY.DATA[['embedding_vector']].to_dict()['embedding_vector']
+            labels = SPOTIFY.DATA[['embedding_vector']].to_dict()['embedding_vector']
             emb_dim = SPOTIFY.EMB_DIM
 
             if test_type == 'cos':
