@@ -85,8 +85,10 @@ def train_model(model, model_name, max_words, threshold, quick):
     time_start = time.perf_counter()
     
     if quick:
+        temp_model_name = './Models/spotify/temp/DELETE.' + str(max_words) + '.' + str(threshold) + '.' + model_name
         model_name = './Models/spotify/DELETE.' + str(max_words) + '.' + str(threshold) + '.' + model_name
     else:
+        temp_model_name = './Models/spotify/temp/' + str(max_words) + '.' + str(threshold) + '.' + model_name
         model_name = './Models/spotify/' + str(max_words) + '.' + str(threshold) + '.' + model_name
 
     train_list = list(SPOTIFY.DATA.loc[SPOTIFY.DATA.split == 'train'].index.values)
@@ -118,7 +120,7 @@ def train_model(model, model_name, max_words, threshold, quick):
         metrics=['mean_squared_error']
     )
 
-    checkpoint = ModelCheckpoint(model_name + '_lr_00005.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    checkpoint = ModelCheckpoint(temp_model_name + '_lr_00005.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     early_stop = EarlyStopping(monitor='val_loss', patience=3, mode='min', restore_best_weights=True) 
     callbacks_list = [checkpoint, early_stop]
 
@@ -130,7 +132,7 @@ def train_model(model, model_name, max_words, threshold, quick):
         callbacks=callbacks_list
     )
     
-    with open(model_name + '_lr_00005.history.pkl', 'wb') as file_pi:
+    with open(temp_model_name + '_lr_00005.history.pkl', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
     ################################################# lr=0.00001
@@ -140,7 +142,7 @@ def train_model(model, model_name, max_words, threshold, quick):
         metrics=['mean_squared_error']
     )
 
-    checkpoint = ModelCheckpoint(model_name + '_lr_00001.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    checkpoint = ModelCheckpoint(temp_model_name + '_lr_00001.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     early_stop = EarlyStopping(monitor='val_loss', patience=3, mode='min', restore_best_weights=True) 
     callbacks_list = [checkpoint, early_stop]
 
@@ -152,7 +154,7 @@ def train_model(model, model_name, max_words, threshold, quick):
         callbacks=callbacks_list
     )
 
-    with open(model_name + '_lr_00001.history.pkl', 'wb') as file_pi:
+    with open(temp_model_name + '_lr_00001.history.pkl', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
     ################################################# lr=0.000001

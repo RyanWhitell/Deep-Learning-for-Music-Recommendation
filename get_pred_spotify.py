@@ -225,7 +225,7 @@ class DataGeneratorLYRICS(keras.utils.Sequence):
 
         return X, Y
 
-def get_predictions(model_path, features):
+def get_predictions(model_path, features, desc):
     K.clear_session()
     
     batch_size = 21
@@ -299,78 +299,21 @@ def get_predictions(model_path, features):
         verbose=1
     )
 
-    return vector_out
+    data = FILE.create_group(desc)
 
+    for track_id, pred in zip(track_ids, vector_out):
+        data[str(track_id)] = pred
+        
 if __name__ == '__main__':
-    chroma_rnn = get_predictions("./Models/rnn/cos/spotify.chroma.RNN_LARGE.hdf5", 'chroma')
-    mfcc_rnn = get_predictions("./Models/rnn/cos/spotify.mfcc.RNN_LARGE.hdf5", 'mfcc')
-
-    cqt_freq = get_predictions("./Models/cnn/cos/spotify.cqt.Freq.hdf5", 'cqt')
-    cqt_time = get_predictions("./Models/cnn/cos/spotify.cqt.Time.hdf5", 'cqt')
-
-    mel_scaled_stft_freq = get_predictions("./Models/cnn/cos/spotify.mel_scaled_stft.Freq.hdf5", 'mel_scaled_stft')
-    mel_scaled_stft_time = get_predictions("./Models/cnn/cos/spotify.mel_scaled_stft.Time.hdf5", 'mel_scaled_stft')
-
-    lyrics = get_predictions("./Models/spotify/1.0.001.Lyrics.hdf5", 'lyrics') # SPOTIFY(max_words=1, threshold=0.001)
-    albums = get_predictions("./Models/spotify/Albums.hdf5", 'albums')
-
-    chroma_rnn_list = []
-    for pred in chroma_rnn:
-        chroma_rnn_list.append(list(pred))
-    del chroma_rnn
-
-    mfcc_rnn_list = []
-    for pred in mfcc_rnn:
-        mfcc_rnn_list.append(list(pred))
-    del mfcc_rnn
-
-    cqt_freq_list = []
-    for pred in cqt_freq:
-        cqt_freq_list.append(list(pred))
-    del cqt_freq
-
-    cqt_time_list = []
-    for pred in cqt_time:
-        cqt_time_list.append(list(pred))
-    del cqt_time
-
-    mel_scaled_stft_freq_list = []
-    for pred in mel_scaled_stft_freq:
-        mel_scaled_stft_freq_list.append(list(pred))
-    del mel_scaled_stft_freq
-
-    mel_scaled_stft_time_list = []
-    for pred in mel_scaled_stft_time:
-        mel_scaled_stft_time_list.append(list(pred))
-    del mel_scaled_stft_time
-
-    lyrics_list = []
-    for pred in lyrics:
-        lyrics_list.append(list(pred))
-    del lyrics
-
-    albums_list = []
-    for pred in albums:
-        albums_list.append(list(pred))
-    del albums
-
-    predictions = pd.DataFrame(data={}, index=list(SPOTIFY.DATA.index.values))
-
-    predictions['chroma_rnn'] = chroma_rnn_list
-    predictions['mfcc_rnn'] = mfcc_rnn_list
-
-    predictions['cqt_freq'] = cqt_freq_list
-    predictions['cqt_time'] = cqt_time_list
+    FILE = h5py.File('./Results/spotify/predictions.hdf5', 'a')
     
-    predictions['mel_scaled_stft_freq'] = mel_scaled_stft_freq_list
-    predictions['mel_scaled_stft_time'] = mel_scaled_stft_time_list
+    get_predictions("./Models/rnn/cos/spotify.chroma.RNN_LARGE.hdf5", 'chroma', 'chroma_rnn')
+    get_predictions("./Models/rnn/cos/spotify.mfcc.RNN_LARGE.hdf5", 'mfcc', 'mfcc_rnn')
+    get_predictions("./Models/cnn/cos/spotify.cqt.Freq.hdf5", 'cqt', 'cqt_time_cnn')
+    get_predictions("./Models/cnn/cos/spotify.cqt.Time.hdf5", 'cqt', 'cqt_freq_cnn')
+    get_predictions("./Models/cnn/cos/spotify.mel_scaled_stft.Freq.hdf5", 'mel_scaled_stft', 'mel_scaled_stft_freq_cnn')
+    get_predictions("./Models/cnn/cos/spotify.mel_scaled_stft.Time.hdf5", 'mel_scaled_stft', 'mel_scaled_stft_time_cnn')
+    get_predictions("./Models/spotify/1.0.001.Lyrics.hdf5", 'lyrics', 'lyrics_rnn') # SPOTIFY(max_words=1, threshold=0.001)
+    get_predictions("./Models/spotify/Albums.hdf5", 'albums', 'albums_cnn')
 
-    predictions['lyrics'] = lyrics_list
-    predictions['albums'] = albums_list
-
-    with open('./Results/spotify/predictions.pickle', 'wb') as f:
-        save = {
-            'predictions': predictions
-        }
-        pickle.dump(save, f, pickle.HIGHEST_PROTOCOL)
-        del save
+    FILE.close()

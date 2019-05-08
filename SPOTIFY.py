@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import random
 from collections import Counter
+from sklearn.preprocessing import StandardScaler
 
 class SPOTIFY:
     def __init__(self, max_words=1, threshold=0.001):
@@ -44,6 +45,45 @@ class SPOTIFY:
             self.GENRES_SORTED = save['genres_sorted']
             self.ARTIST_GENRE = save['artist_genre']   
             del save
+
+        scaler_lat = StandardScaler()
+        scaler_lat.fit(self.DATA.lat.values.reshape(-1, 1))
+        lat_min, lat_max = min(self.DATA.lat.values), max(self.DATA.lat.values)
+
+        scaler_lng = StandardScaler()
+        scaler_lng.fit(self.DATA.lng.values.reshape(-1, 1))
+        lng_min, lng_max = min(self.DATA.lng.values), max(self.DATA.lng.values)
+
+        scaler_year = StandardScaler()
+        scaler_year.fit(np.array(self.DATA.year.values.reshape(-1, 1), dtype=np.float32))
+        year_min, year_max = min(self.DATA.year.values), max(self.DATA.year.values)
+
+        embedding_vector_unit = []
+        lat_scaled = []
+        lat_norm = []
+        lng_scaled = []
+        lng_norm = []
+        year_scaled = []
+        year_norm = []
+
+        for _, track in self.DATA.iterrows():
+            embedding_vector_unit.append(track.embedding_vector / np.linalg.norm(track.embedding_vector))
+
+            lat_scaled.append(scaler_lat.transform([[track.lat]])[0][0])
+            lng_scaled.append(scaler_lng.transform([[track.lng]])[0][0])
+            year_scaled.append(scaler_year.transform([[float(track.year)]])[0][0])
+            
+            lat_norm.append((track.lat - lat_min)/(lat_max - lat_min))
+            lng_norm.append((track.lng - lng_min)/(lng_max - lng_min))
+            year_norm.append((track.year - year_min)/(year_max - year_min))
+
+        self.DATA['embedding_vector_unit'] = embedding_vector_unit
+        self.DATA['lat_scaled'] = lat_scaled
+        self.DATA['lat_norm'] = lat_norm
+        self.DATA['lng_scaled'] = lng_scaled
+        self.DATA['lng_norm'] = lng_norm
+        self.DATA['year_scaled'] = year_scaled
+        self.DATA['year_norm'] = year_norm
 
         with open('./Data/Spotify/embedding_model.emb.pickle', 'rb') as f:
             save = pickle.load(f)
