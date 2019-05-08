@@ -8,8 +8,6 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras import backend as K
 from keras.utils import to_categorical
 
-from keras.datasets import cifar100
-
 import h5py
 import pickle
 import argparse
@@ -18,8 +16,8 @@ import FMA
 import SPOTIFY
 
 parser = argparse.ArgumentParser(description="trains a model")
-parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, cifar100')
-parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc)')
+parser.add_argument('-d', '--dataset', required=True, help='dataset to use: fma_med, fma_large, spotify')
+parser.add_argument('-t', '--test', default='', help='test to carry out: single genre classification (sgc). multi genre classification (mgc). cosine/mse distance regression (cos/mse).')
 parser.add_argument('-f', '--features', default='', help='which features to use: stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc')
 parser.add_argument('-q', '--quick', default=False, help='runs each test quickly to ensure they will run')
 args = parser.parse_args()
@@ -28,6 +26,7 @@ args = parser.parse_args()
 Valid test combinations:
 fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 fma_large -> mgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
+spotify -> cos, mse -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 """
 
 class DataGeneratorSPOTIFY(keras.utils.Sequence):
@@ -174,6 +173,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
                 early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
                 callbacks_list = [checkpoint, early_stop]
+
             elif test_type == 'mgc':
                 model.compile(
                     loss=keras.losses.binary_crossentropy,
@@ -183,6 +183,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
                 early_stop = EarlyStopping(monitor='val_loss', patience=10, mode='min') 
                 callbacks_list = [checkpoint, early_stop]
+
             else:
                 raise Exception('Unknown test type!')
 
@@ -380,9 +381,7 @@ def RNN_LARGE(input_shape, test_type, num_classes):
 
     return  Model(inputs=inputs, outputs=pred)
 
-
 if __name__ == '__main__':
-
     if args.dataset in ['fma_med', 'fma_large', 'spotify']:
         if args.dataset == 'fma_med':
             FMA = FMA.FreeMusicArchive('medium', 22050)

@@ -26,7 +26,7 @@ args = parser.parse_args()
 
 """
 Valid test combinations:
-cifar100
+cifar100 -> sgc
 fma_med -> sgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 fma_large -> mgc -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc
 spotify -> cos, mse -> stft, stft_halved, mel_scaled_stft, cqt, chroma, mfcc

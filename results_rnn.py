@@ -237,7 +237,6 @@ if __name__ == '__main__':
         results['hist_val_acc'] = [hist['val_categorical_accuracy']]
         results['epochs'] = len(hist['categorical_accuracy'])
     
-
         sm, acc, macro, micro, weighted = test_model_sgc(model_name='RNN', dim=dim, features=args.features, dataset=args.dataset)
 
         results['accuracy'] = acc 
