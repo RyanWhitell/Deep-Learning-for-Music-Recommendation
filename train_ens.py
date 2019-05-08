@@ -142,23 +142,21 @@ def train_model(model, model_name, dataset, test_type, quick):
             if test_type == 'sgc':
                 model.compile(
                     loss=keras.losses.categorical_crossentropy,
-                    optimizer=keras.optimizers.Adam(),
+                    optimizer=keras.optimizers.Adam(lr=0.0001),
                     metrics=['categorical_accuracy']
                 )
-                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
-                early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
-                callbacks_list = [checkpoint, early_stop]
             elif test_type == 'mgc':
                 model.compile(
                     loss=keras.losses.binary_crossentropy,
-                    optimizer=keras.optimizers.Adam(),
-                    metrics=['categorical_accuracy', 'binary_accuracy', 'mean_squared_error']
+                    optimizer=keras.optimizers.Adam(lr=0.0001),
+                    metrics=['categorical_accuracy']
                 )
-                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-                early_stop = EarlyStopping(monitor='val_loss', patience=10, mode='min') 
-                callbacks_list = [checkpoint, early_stop]
             else:
                 raise Exception('Unknown test type!')
+
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
+            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
+            callbacks_list = [checkpoint, early_stop]
 
             if quick:
                 epochs = 1
@@ -187,7 +185,8 @@ def train_model(model, model_name, dataset, test_type, quick):
                 batch_size=vbs,
                 n_classes=num_classes,
                 dataset=dataset,
-                test_type=test_type
+                test_type=test_type,
+                shuffle=False
             )
 
             history = model.fit_generator(
@@ -252,7 +251,7 @@ def ENS(dataset, test_type, num_classes, quick):
     cqt_freq_model   = Model(inputs=cqt_freq_model.input, outputs=cqt_freq_model.get_layer('logits').output)
     chroma_rnn_model = Model(inputs=chroma_rnn_model.input, outputs=chroma_rnn_model.get_layer('logits').output)
     mfcc_rnn_model   = Model(inputs=mfcc_rnn_model.input, outputs=mfcc_rnn_model.get_layer('logits').output)
-
+    
     for layer in stft_time_model.layers:
         layer.trainable = False
     for layer in mel_time_model.layers:
@@ -287,53 +286,27 @@ def ENS(dataset, test_type, num_classes, quick):
     chroma = chroma_rnn_model(X_chroma)
     mfcc = mfcc_rnn_model(X_mfcc)
     
-    if test_type == 'sgc':
-        # 16 logits
-        d1, d2, d3, d4, d5 = 256, 4096, 2048, 512, 256
-    if test_type == 'mgc':
-        # 161 logits
-        d1, d2, d3, d4, d5 = 512, 8192, 4096, 1024, 512
-
-    stft_t = stft_time_model(X_stft)
-    stft_t = layers.Dense(d1, activation='relu', name='stft_time_model_input')(stft_t)
-
-    mel_t = mel_time_model(X_mel)
-    mel_t = layers.Dense(d1, activation='relu', name='mel_time_model_input')(mel_t)
-
-    cqt_t = cqt_time_model(X_cqt)
-    cqt_t = layers.Dense(d1, activation='relu', name='cqt_time_model_input')(cqt_t)
-    
-    stft_f = stft_freq_model(X_stft)
-    stft_f = layers.Dense(d1, activation='relu', name='stft_freq_model_input')(stft_f)
-
-    mel_f = mel_freq_model(X_mel)
-    mel_f = layers.Dense(d1, activation='relu', name='mel_freq_model_input')(mel_f)
-
-    cqt_f = cqt_freq_model(X_cqt)
-    cqt_f = layers.Dense(d1, activation='relu', name='cqt_freq_model_input')(cqt_f)
-    
-    chroma = chroma_rnn_model(X_chroma)
-    chroma = layers.Dense(d1, activation='relu', name='chroma_rnn_model_input')(chroma)
-
-    mfcc = mfcc_rnn_model(X_mfcc)
-    mfcc = layers.Dense(d1, activation='relu', name='mfcc_rnn_model_input')(mfcc)
-
     x = layers.concatenate([stft_t, mel_t, cqt_t, stft_f, mel_f, cqt_f, chroma, mfcc], name='All_Model_Logits')
-
-    x = layers.Dense(d2, activation='relu', name='fc1')(x)
     
-    x = layers.Dense(d3, activation='relu', name='fc2')(x)
-
-    x = layers.Dense(d4, activation='relu', name='fc3')(x)
-
-    x = layers.Dense(d5, activation='relu', name='fc4')(x)
-
+    x = layers.Dense(1024, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
+    x = layers.Activation('relu', name='fc_1_relu')(x)
+    x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+    
+    x = layers.Dense(512, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
+    x = layers.Activation('relu', name='fc_2_relu')(x)
+    x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+    
+    x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_3')(x)
+    x = layers.Activation('relu', name='fc_3_relu')(x)
+    x = layers.Dropout(0.5, name='fc_3_dropout')(x)
+    
+    x = layers.Dense(num_classes, name='logits')(x)
+    
     if test_type == 'sgc':
         output_activation = 'softmax'
     elif test_type == 'mgc':
         output_activation = 'sigmoid'
 
-    pred = layers.Dense(num_classes, activation=output_activation, name=output_activation)(x)
     pred = layers.Activation(output_activation, name=output_activation)(x)
     
     return Model(inputs=[X_stft, X_mel, X_cqt, X_chroma, X_mfcc], outputs=pred)

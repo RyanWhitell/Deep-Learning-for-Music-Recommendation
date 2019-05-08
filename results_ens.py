@@ -74,16 +74,10 @@ class DataGenerator(keras.utils.Sequence):
         X_chroma = np.empty((self.batch_size, 12,   643))
         X_mfcc   = np.empty((self.batch_size, 12,   643))
         
-        if self.test_type == 'sgc':
-            y = np.empty((self.batch_size), dtype=int)
-        if self.test_type == 'mgc':
-            y = np.empty((self.batch_size, self.n_classes), dtype=int)
+        y = np.empty((self.batch_size), dtype=int)
         
         for i, ID in enumerate(list_IDs_temp):
-            if self.test_type == 'sgc':
-                y[i] = self.labels[ID]
-            if self.test_type == 'mgc':
-                y[i,:] = self.labels[ID]
+            y[i] = self.labels[ID]
             
         with h5py.File(self.stft_data_path,'r') as f:
             for i, ID in enumerate(list_IDs_temp):
