@@ -246,9 +246,15 @@ if __name__ == '__main__':
         raise Exception('Wrong dataset!')
 
     if args.test == 'sgc':
-        results = pd.DataFrame({
-            'name':['Time','Freq','Simple','TimeFreq']
-        })
+
+        if args.dataset == 'fma_med':
+            results = pd.DataFrame({
+                'name':['Time','Freq','Simple','TimeFreq']
+            })
+        else: 
+            results = pd.DataFrame({
+                'name':['Time','Freq','Simple']
+            })
 
         hist_acc = []
         hist_val_acc = []
@@ -265,9 +271,9 @@ if __name__ == '__main__':
             hist_path = './Models/cnn/' + args.test + '/' + args.dataset + '.' + args.features + '.' + row['name'] + '.history.pkl'
             
             hist=pickle.load(open(hist_path, "rb" ))
-            hist_acc.append(hist['categorical_accuracy'])
-            hist_val_acc.append(hist['val_categorical_accuracy'])
-            epochs.append(len(hist['categorical_accuracy']))
+            hist_acc.append(hist['acc'])
+            hist_val_acc.append(hist['val_acc'])
+            epochs.append(len(hist['acc']))
 
             sm, acc, macro, micro, weighted = test_model_sgc(model_name=row['name'], dim=dim, features=args.features, dataset=args.dataset)
             accuracy.append(acc) 

@@ -173,11 +173,12 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 model.compile(
                     loss=keras.losses.categorical_crossentropy,
                     optimizer=keras.optimizers.Adam(),
-                    metrics=['categorical_accuracy']
+                    metrics=['acc']
                 )
-                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
-                early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=20, mode='max') 
+                checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+                early_stop = EarlyStopping(monitor='val_acc', patience=20, mode='max') 
                 callbacks_list = [checkpoint, early_stop]
+
             elif test_type == 'mgc':
                 model.compile(
                     loss=keras.losses.binary_crossentropy,
@@ -187,6 +188,7 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
                 early_stop = EarlyStopping(monitor='val_loss', patience=10, mode='min') 
                 callbacks_list = [checkpoint, early_stop]
+
             else:
                 raise Exception('Unknown test type!')
 
@@ -304,8 +306,8 @@ def train_model(model, model_name, dim, features, dataset, test_type, quick):
                 metrics=['acc']
             )
 
-            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_categorical_accuracy', verbose=1, save_best_only=True, mode='max')
-            early_stop = EarlyStopping(monitor='val_categorical_accuracy', patience=10, mode='max') 
+            checkpoint = ModelCheckpoint(model_name + '.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+            early_stop = EarlyStopping(monitor='val_acc', patience=10, mode='max') 
             callbacks_list = [checkpoint, early_stop]
 
             if quick:
@@ -602,18 +604,18 @@ def Freq(features, test_type, iks, input_shape, num_classes):
 
 def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
     if quick:
-        time_path = './Models/cnn/' + test_type + '/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
-        freq_path = './Models/cnn/' + test_type + '/' + 'DELETE.' + dataset + '.' + features + '.' + 'Freq.hdf5'
+        time_path = './Models/cnn/sgc/' + 'DELETE.' + dataset + '.' + features + '.' + 'Time.hdf5'
+        freq_path = './Models/cnn/sgc/' + 'DELETE.' + dataset + '.' + features + '.' + 'Freq.hdf5'
     else:
-        time_path = './Models/cnn/' + test_type + '/' + dataset + '.' + features + '.' + 'Time.hdf5'
-        freq_path = './Models/cnn/' + test_type + '/' + dataset + '.' + features + '.' + 'Freq.hdf5'
+        time_path = './Models/cnn/sgc/' + dataset + '.' + features + '.' + 'Time.hdf5'
+        freq_path = './Models/cnn/sgc/' + dataset + '.' + features + '.' + 'Freq.hdf5'
 
     time_model = load_model(time_path)
     freq_model = load_model(freq_path)
 
     time_model = Model(inputs=time_model.input, outputs=time_model.get_layer('logits').output)
     freq_model = Model(inputs=freq_model.input, outputs=freq_model.get_layer('logits').output)
-
+    
     for layer in time_model.layers:
         layer.trainable = False
     for layer in freq_model.layers:
@@ -621,38 +623,22 @@ def TimeFreq(features, test_type, dataset, input_shape, num_classes, quick):
 
     inputs = layers.Input(shape=input_shape)
     
-    if test_type == 'sgc':
-        # 16 logits
-        d1, d2, d3, d4 = 256, 1024, 512, 256
-    if test_type == 'mgc':
-        # 161 logits
-        d1, d2, d3, d4 = 512, 2048, 1024, 512
-    if test_type in ['cos', 'mse']:
-        # 800 logits
-        d1, d2, d3, d4 = 1024, 4096, 2048, 1024
-
     t = time_model(inputs)
-    t = layers.Dense(d1, activation='relu', name='time_input')(t)
-
     f = freq_model(inputs)
-    f = layers.Dense(d1, activation='relu', name='freq_input')(f)
-
-    x = layers.concatenate([t,f], name='Time_Freq')
-
-    x = layers.Dense(d2, activation='relu', name='fc1')(x)
     
-    x = layers.Dense(d3, activation='relu', name='fc2')(x)
-
-    x = layers.Dense(d4, activation='relu', name='fc3')(x)
-
-    if test_type == 'sgc':
-        output_activation = 'softmax'
-    elif test_type == 'mgc':
-        output_activation = 'sigmoid'
-    elif test_type in ['cos', 'mse']:
-        output_activation = 'linear'
-
-    pred = layers.Dense(num_classes, activation=output_activation, name=output_activation)(x)
+    x = layers.concatenate([t,f], name='Time_Freq')
+    
+    x = layers.Dense(256, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_1')(x)
+    x = layers.Activation('relu', name='fc_1_relu')(x)
+    x = layers.Dropout(0.5, name='fc_1_dropout')(x)
+    
+    x = layers.Dense(128, kernel_regularizer=layers.regularizers.l2(0.002), name='fc_2')(x)
+    x = layers.Activation('relu', name='fc_2_relu')(x)
+    x = layers.Dropout(0.5, name='fc_2_dropout')(x)
+    
+    x = layers.Dense(num_classes, name='logits')(x)
+    
+    pred = layers.Activation('softmax', name='softmax')(x)
     
     return Model(inputs=inputs, outputs=pred)
 
@@ -714,26 +700,27 @@ if __name__ == '__main__':
     else:
         raise Exception('Wrong dataset!')
 
-    ################## Freq ################
-    #K.clear_session()
-    #model = Freq(features=args.features, test_type=args.test, iks=fiks, input_shape=dim, num_classes=num_classes)
-    #model.summary()
-    #train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick) 
-
-    ################# Time ################
-    #K.clear_session()
-    #model = Time(features=args.features, test_type=args.test, iks=tiks, input_shape=dim, num_classes=num_classes)
-    #model.summary()
-    #train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
-
-    ################# Simple ################
-    #K.clear_session()
-    #model = Simple(features=args.features, test_type=args.test, input_shape=dim, num_classes=num_classes)
-    #model.summary()
-    #train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
-
-    ############### TimeFreq ################
+    ################# Freq ################
     K.clear_session()
-    model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
+    model = Freq(features=args.features, test_type=args.test, iks=fiks, input_shape=dim, num_classes=num_classes)
     model.summary()
-    train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       
+    train_model(model=model, model_name='Freq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick) 
+
+    ################ Time ################
+    K.clear_session()
+    model = Time(features=args.features, test_type=args.test, iks=tiks, input_shape=dim, num_classes=num_classes)
+    model.summary()
+    train_model(model=model, model_name='Time', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
+
+    ################ Simple ################
+    K.clear_session()
+    model = Simple(features=args.features, test_type=args.test, input_shape=dim, num_classes=num_classes)
+    model.summary()
+    train_model(model=model, model_name='Simple', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)  
+
+    if args.dataset == 'fma_med' and args.test == 'sgc':
+        ############### TimeFreq ################
+        K.clear_session()
+        model = TimeFreq(features=args.features, test_type=args.test, dataset=args.dataset, input_shape=dim, num_classes=num_classes, quick=args.quick)
+        model.summary()
+        train_model(model=model, model_name='TimeFreq', dim=dim, features=args.features, dataset=args.dataset, test_type=args.test, quick=args.quick)       
